@@ -1,0 +1,20 @@
+# Radio channels. Edit here and run /radio reload, or use /radio channel create|delete|rename|color|frequency in game
+# (those commands rewrite this file; comments below the header are not kept).
+#
+# <id>:                 lower-case letters, digits, _ and -; used in permissions: radio.channel.<id>.listen / .speak
+#   name:               display name, MiniMessage
+#   color:              #RRGGBB or a colour name (green, gold, ...); used for the channel tag and the GUI button
+#   frequency:          free label shown next to the name, e.g. "101.5". Optional.
+#   icon:               material of the channel button in the plain GUI. Optional.
+#   glyph:              text shown before the name in messages (<glyph>), e.g. a character of a pack font. Optional.
+#   sounds:             per-channel overrides of config.yml sounds (in, out, power-on, power-off, switch). Optional.
+#     in: {key: "radio:radio.in", fallback: "minecraft:block.note_block.hat", volume: 1.0, pitch: 1.0}
+#
+# The channel "global" always exists: if it is removed here it is created again. Everyone may listen and speak on it
+# by default; every other channel is closed until a permission is granted.
+channels:
+  global:
+    name: "<green>Global"
+    color: "#55FF55"
+    frequency: "100.0"
+    icon: LIME_DYE

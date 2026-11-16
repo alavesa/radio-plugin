@@ -1,0 +1,7 @@
+{
+ "parent": "minecraft:item/generated",
+ "textures": {
+  "layer0": "radio:item/gui/channel",
+  "layer1": "radio:item/gui/channel_overlay"
+ }
+}

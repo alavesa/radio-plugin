@@ -1,0 +1,24 @@
+name: Radio
+version: '${version}'
+main: fi.alavesa.radio.RadioPlugin
+api-version: '26.3'
+description: Handheld radios with channels, a transceiver GUI, sounds and signal effects
+softdepend: [LuckPerms, voicechat]
+author: Piia Alavesa
+
+# /radio is registered with Brigadier (LifecycleEvents.COMMANDS) in RadioCommand, not here.
+
+permissions:
+  radio.admin:
+    description: Everything, including every channel and the channel commands
+    default: op
+    children:
+      radio.use: true
+      radio.give: true
+      radio.reload: true
+      radio.channel.*: true
+  radio.use: {default: true, description: "Use a radio: open it, tune it, listen and speak (per-channel permissions still apply)"}
+  radio.give: {default: op, description: /radio give}
+  radio.reload: {default: op, description: /radio reload}
+  # radio.channel.<id>.listen, radio.channel.<id>.speak, radio.channel.<id>.* and radio.channel.* are registered at
+  # runtime for every channel in channels.yml: true for "global", false for every other channel.

@@ -1,0 +1,42 @@
+{
+ "radio.in": {
+  "sounds": [
+   {
+    "name": "radio:radio/in"
+   }
+  ],
+  "subtitle": "subtitles.radio.in"
+ },
+ "radio.out": {
+  "sounds": [
+   {
+    "name": "radio:radio/out"
+   }
+  ],
+  "subtitle": "subtitles.radio.out"
+ },
+ "radio.power_on": {
+  "sounds": [
+   {
+    "name": "radio:radio/power_on"
+   }
+  ],
+  "subtitle": "subtitles.radio.power_on"
+ },
+ "radio.power_off": {
+  "sounds": [
+   {
+    "name": "radio:radio/power_off"
+   }
+  ],
+  "subtitle": "subtitles.radio.power_off"
+ },
+ "radio.switch": {
+  "sounds": [
+   {
+    "name": "radio:radio/switch"
+   }
+  ],
+  "subtitle": "subtitles.radio.switch"
+ }
+}

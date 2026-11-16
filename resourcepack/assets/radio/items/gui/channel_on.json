@@ -1,0 +1,12 @@
+{
+ "model": {
+  "type": "minecraft:model",
+  "model": "radio:item/gui/channel_on",
+  "tints": [
+   {
+    "type": "minecraft:dye",
+    "default": -1
+   }
+  ]
+ }
+}

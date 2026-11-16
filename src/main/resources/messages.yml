@@ -1,0 +1,112 @@
+# Radio messages, MiniMessage (https://docs.advntr.dev/minimessage/format.html). /radio reload re-reads this file.
+# A message set to "" is not sent.
+
+prefix: "<dark_gray>[<gold>Radio</gold>]</dark_gray> "
+
+# A radio transmission, as every listener sees it.
+# <channel> display name, <channel_color>...</channel_color> the channel's colour, <frequency>, <glyph>,
+# <sender> display name, <prefix>/<suffix> LuckPerms meta (empty without LuckPerms), <message> the text (never parsed).
+format:
+  message: "<dark_gray>[<channel_color><glyph><channel></channel_color><dark_gray>]</dark_gray> <prefix><white><sender></white><suffix><dark_gray>:</dark_gray> <gray><message>"
+  console: "[Radio/<id>] <sender>: <message>"
+
+error:
+  no-permission: "<red>You may not do that."
+  players-only: "<red>Only players can do that."
+  no-radio: "<red>You need a radio. <gray>(<rule>)"
+  radio-off: "<red>Your radio is switched off. <gray>Sneak + right-click it, or /radio power."
+  no-channel: "<red>Your radio is not tuned to a channel you can use."
+  unknown-channel: "<red>There is no channel <white><id></white>."
+  cannot-speak: "<red>You may not speak on <channel><red>."
+  cannot-listen: "<red>You may not listen to <channel><red>."
+  too-long: "<red>That message is too long (<length>/<max> characters)."
+  empty: "<red>Nothing to send."
+  cooldown: "<red>Wait a moment before transmitting again."
+  rate-limit: "<red>Too many transmissions. Slow down."
+  invalid-id: "<red>Channel ids use a-z, 0-9, _ and - (at most 32 characters)."
+  channel-exists: "<red>The channel <white><id></white> already exists."
+  global-protected: "<red>The global channel cannot be deleted."
+  invalid-color: "<red>Unknown colour <white><color></white>. Use #RRGGBB or a name such as gold."
+  no-players: "<red>No player matched."
+
+rule:
+  held: "hold it in a hand"
+  hotbar: "keep it in your hotbar"
+  inventory: "carry it in your inventory"
+
+power:
+  on: "<green>ON"
+  off: "<red>OFF"
+  switched-on: "<gray>Radio <green>on</green>."
+  switched-off: "<gray>Radio <red>off</red>."
+
+mode:
+  chat-on: "<gray>Radio chat <green>on</green>: what you type in chat goes to your radio channel while a powered radio is with you."
+  chat-off: "<gray>Radio chat <red>off</red>: use <white>/radio talk</white> or the radio's Send button."
+
+channel:
+  tuned: "<gray>Tuned to <channel> <dark_gray>(<frequency>)"
+  created: "<gray>Channel <channel> <gray>(<white><id></white>) created. Grant <white>radio.channel.<id>.listen</white> and <white>.speak</white>."
+  deleted: "<gray>Channel <white><id></white> deleted."
+  renamed: "<gray>Channel <white><id></white> is now <channel><gray>."
+  recolored: "<gray>Channel <channel> <gray>recoloured."
+  frequency-set: "<gray>Channel <channel> <gray>is now on <white><frequency></white>."
+  list-header: "<gray>Channels (<count>):"
+  list-entry: "<dark_gray> • <channel> <dark_gray>(<white><id></white>, <frequency>) <gray><listeners> listening"
+
+give:
+  given: "<gray>Gave <white><amount></white> radio(s) to <white><player></white>."
+  received: "<gray>You received a radio."
+
+reload:
+  done: "<gray>Reloaded: <white><channels></white> channel(s)<problems>."
+  problems: ", <yellow><count> warning(s) in the console"
+
+pack:
+  status: "<gray>Resource pack: <white><status></white> <dark_gray>(delivery <delivery>)"
+  resent: "<gray>Sending the resource pack again."
+
+dialog:
+  title: "<gold>Radio transmission"
+  body: "<gray>Speak on a channel. Everyone listening with a powered radio hears it."
+  message-label: "<gray>Message"
+  channel-label: "<gray>Channel"
+  send: "<green>Send"
+  cancel: "<gray>Cancel"
+
+gui:
+  # Title of the plain GUI (the transceiver GUI draws its own).
+  title: "<dark_gray>Radio <gray>» <channel>"
+  title-off: "<dark_gray>Radio <gray>» <red>off"
+  power-on: "<green>Power: ON"
+  power-off: "<red>Power: OFF"
+  power-lore: "<gray>Click to switch"
+  volume: "<yellow>Volume: <white><volume>%"
+  volume-up: "<yellow>Volume +"
+  volume-down: "<yellow>Volume −"
+  mode-dialog: "<aqua>Input: dialog"
+  mode-chat: "<aqua>Input: chat"
+  mode-lore: "<gray>Click to change how you write radio messages"
+  talk: "<green>Send a message"
+  talk-lore: "<gray>Opens the message dialog"
+  scroll-up: "<gray>▲ Up"
+  scroll-down: "<gray>▼ Down"
+  close: "<red>Close"
+  current: "<gray>Tuned: <channel>"
+  current-none: "<gray>Tuned: <red>nothing"
+  channel-name: "<channel>"
+  channel-lore:
+    - "<gray>Frequency: <white><frequency>"
+    - "<gray>Listening now: <white><listeners>"
+    - "<listen>  <speak>"
+    - "<selected>"
+  can-listen: "<green>✔ listen"
+  cannot-listen: "<red>✘ listen"
+  can-speak: "<green>✔ speak"
+  cannot-speak: "<red>✘ speak"
+  selected: "<gold>▶ Tuned"
+  not-selected: "<dark_gray>Click to tune"
+  # Text on the transceiver GUI's display line.
+  lcd-on: "<frequency> <channel>"
+  lcd-off: ""
+  lcd-no-channel: "--.- NO CHANNEL"

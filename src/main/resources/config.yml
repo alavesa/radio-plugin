@@ -1,0 +1,134 @@
+# Radio: handheld radios with channels, a transceiver GUI, sounds and screen effects.
+# /radio reload re-reads this file, channels.yml and messages.yml. Invalid values fall back to the defaults below
+# with a warning in the console.
+
+# How players write radio messages unless they chose otherwise (/radio chat, or the button in the radio GUI):
+#   dialog  a native dialog with a text box and a channel selector
+#   chat    normal chat goes to the radio channel while a powered radio is carried
+default-mode: dialog
+
+radio:
+  # When does a carried radio work (receive and transmit)?
+  #   held       only in the main hand or off hand
+  #   hotbar     anywhere in the hotbar, or the off hand
+  #   inventory  anywhere in the inventory
+  works-when: hotbar
+  # Volume of a new radio, 0-100. It scales every radio sound for that listener.
+  default-volume: 80
+  # One click on the volume buttons changes the volume by this much.
+  volume-step: 10
+  # New radios start switched on?
+  default-power: true
+
+item:
+  # Base material. Radios are recognised by a hidden tag, never by name or material, so this can be changed freely;
+  # radios that already exist keep the material they were made with.
+  material: PAPER
+  name: "<gold>Handheld Radio"
+  # Placeholders: <channel> <frequency> <power> <volume>
+  lore:
+    - "<gray>Channel: <channel> <dark_gray>(<frequency>)"
+    - "<gray>Power: <power>  <gray>Volume: <white><volume>%"
+    - ""
+    - "<dark_gray>Right-click: open  •  Sneak + right-click: power"
+  # item_model from the resource pack. Empty = keep the base material's own model.
+  # Players WITHOUT the pack see the missing-model cube for a custom item_model; set this to "" if the pack is optional
+  # and that bothers you.
+  model: "radio:radio"
+  # Optional custom_model_data string (for packs that select the model through the base item instead). Empty = none.
+  custom-model-data: ""
+  recipe:
+    enabled: false
+    shape:
+      - " R "
+      - "INI"
+      - "IRI"
+    ingredients:
+      R: REDSTONE
+      I: IRON_INGOT
+      N: NOTE_BLOCK
+
+chat:
+  # Longest radio message, in characters. Longer messages are refused (dialog: the text box stops there).
+  max-length: 200
+  # Minimum time between two transmissions of one player, milliseconds. 0 = no cooldown.
+  cooldown-ms: 1500
+  # At most this many transmissions per player per minute. 0 = unlimited.
+  max-per-minute: 20
+  # Copy every radio message to the server console/log.
+  log-to-console: true
+  # Show the sender's LuckPerms prefix/suffix (<prefix> and <suffix> in messages.yml). Ignored without LuckPerms.
+  luckperms-meta: true
+
+sounds:
+  # Each sound: key = the custom sound from the Radio resource pack, fallback = a vanilla sound used for players who
+  # do not have the pack. volume 0-1 (then scaled by the radio's volume), pitch 0.5-2.
+  # Channels can override any of these in channels.yml. Sounds are only ever played to the players concerned.
+  in:        {key: "radio:radio.in",        fallback: "minecraft:block.note_block.hat",        volume: 0.8, pitch: 1.6}
+  out:       {key: "radio:radio.out",       fallback: "minecraft:block.note_block.bit",        volume: 0.6, pitch: 1.8}
+  power-on:  {key: "radio:radio.power_on",  fallback: "minecraft:block.lever.click",           volume: 0.7, pitch: 1.4}
+  power-off: {key: "radio:radio.power_off", fallback: "minecraft:block.lever.click",           volume: 0.7, pitch: 0.9}
+  switch:    {key: "radio:radio.switch",    fallback: "minecraft:ui.button.click",             volume: 0.5, pitch: 1.5}
+  # Ticks between the "in" sound (transmission starts) and the "out" sound (roger beep). 20 ticks = 1 second.
+  out-delay-ticks: 14
+
+gui:
+  # Use the transceiver GUI (custom art from the pack) for players whose client loaded the pack. Everyone else, and
+  # everyone when this is false, gets the plain chest GUI with the same buttons.
+  fancy: true
+  # How often open radio GUIs refresh their listener counts, ticks.
+  refresh-ticks: 20
+
+post-effects:
+  # Screen effects from the pack (static noise, vignette, chromatic aberration), per player. They need the pack and a
+  # 26.3 client. NOTE: post effects change the 3D view only. Minecraft draws menus on top afterwards, so with the GUI
+  # open the effect is visible on the world BEHIND the menu, not on the menu itself.
+  enabled: true
+  # While the radio GUI is open. "" = none.
+  gui: "radio:gui"
+  # A short burst for every listener when a transmission comes in. "" = none.
+  transmission: "radio:burst"
+  transmission-ticks: 10
+  # All the time while a powered radio is carried (see radio.works-when). "" = none. Try "radio:active".
+  active: ""
+
+pack:
+  # How players get the resource pack:
+  #   auto       same-port, or http when the Minecraft port cannot be hooked (default)
+  #   same-port  served on the Minecraft port itself: nothing to open in a firewall (not behind Velocity/Bungee)
+  #   http       the built-in HTTP server on http.port; that port must be reachable by players
+  #   url        you host plugins/Radio/radio-pack.zip yourself; set url (and sha1) below
+  #   none       the pack is merged into another pack; nothing is sent, every player counts as having it
+  delivery: auto
+  # For delivery: url. The SHA-1 is printed in the console at startup and by tools/zip_pack.sh; when left empty the
+  # SHA-1 of the zip the plugin built is used.
+  url: ""
+  sha1: ""
+  # Kick players who decline the pack? When false they get the plain GUI and vanilla sounds.
+  required: false
+  prompt: "<gold>Radio</gold> <gray>adds the transceiver screen, radio sounds and signal effects."
+  # The host name players' clients download from. Empty = the address each player typed to connect.
+  public-host: ""
+  http:
+    bind: "0.0.0.0"
+    port: 8129
+  # The animated parts of the transceiver GUI (moving waveform, lamp glow, display scanlines) are drawn by Minecraft's
+  # text shader (core/text). Only ONE pack's copy of that shader runs, and SuperbVehicles and CCTV replace it too. So
+  # Radio does not ship its own: it takes the text shader from those plugins' packs (paths below, inside plugins/),
+  # adds its hooks and ships the merged shader. Without those plugins it starts from the vanilla shader. The merge is
+  # redone when their pack files change. false = no text shader at all (the GUI keeps its still art).
+  text-shader:
+    enabled: true
+    superbvehicles-pack: "SuperbVehicles/pack/SuperbVehicles-hud.zip"
+    cctv-pack: "CCTV/cctv-pack.zip"
+  # Ticks to wait after a player joins before sending the pack. The pack sent LAST is the one whose text shader
+  # runs, so Radio waits for the other plugins' packs and sends its own again when another pack loads after it.
+  send-delay-ticks: 40
+  # A folder inside plugins/Radio to build the pack from instead of the files inside the jar (for editing art and
+  # shaders without rebuilding the plugin). Empty = use the jar.
+  source-folder: ""
+
+voice:
+  # EXPERIMENTAL, separate module. Needs the Simple Voice Chat plugin; ignored without it. While a player holds a
+  # powered radio in the MAIN HAND, their voice is also sent (non-positional) to everyone listening on that channel.
+  enabled: false

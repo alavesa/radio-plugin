@@ -1,0 +1,74 @@
+{
+ "providers": [
+  {
+   "type": "space",
+   "advances": {
+    "\ue200": -1,
+    "\ue201": -2,
+    "\ue202": -4,
+    "\ue203": -8,
+    "\ue204": -16,
+    "\ue205": -32,
+    "\ue206": -64,
+    "\ue207": -128,
+    "\ue208": -256,
+    "\ue209": -512,
+    "\ue210": 1,
+    "\ue211": 2,
+    "\ue212": 4,
+    "\ue213": 8,
+    "\ue214": 16,
+    "\ue215": 32,
+    "\ue216": 64,
+    "\ue217": 128,
+    "\ue218": 256,
+    "\ue219": 512
+   }
+  },
+  {
+   "type": "bitmap",
+   "file": "radio:font/panel.png",
+   "height": 256,
+   "ascent": 47,
+   "chars": [
+    "\ue010"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "radio:font/scope.png",
+   "height": 35,
+   "ascent": 35,
+   "chars": [
+    "\ue011"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "radio:font/on_air.png",
+   "height": 34,
+   "ascent": 34,
+   "chars": [
+    "\ue012"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "radio:font/led.png",
+   "height": 31,
+   "ascent": 31,
+   "chars": [
+    "\ue013"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "radio:font/lcd.png",
+   "height": 11,
+   "ascent": 9,
+   "chars": [
+    "\ue014"
+   ]
+  }
+ ]
+}
