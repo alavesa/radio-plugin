@@ -29,6 +29,11 @@
             "name": "Aberration",
             "type": "float",
             "value": 0.25
+          },
+          {
+            "name": "Corner",
+            "type": "float",
+            "value": 0.0
           }
         ]
       }

@@ -14,7 +14,7 @@ import java.util.zip.ZipFile;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Builds the pack's {@code minecraft:core/text} shader (the animated parts of the transceiver GUI).
+ * Builds the pack's {@code minecraft:core/text} shader (it draws the radio popup in the screen corner).
  *
  * <p>Minecraft runs only ONE copy of a core shader: the one in the topmost pack. SuperbVehicles (HUD) and CCTV
  * (camera HUD, monitor screens) replace the same two files, so the Radio pack must not ship a text shader of its own
@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
  *
  * Every block is inserted after a line that exists in the vanilla shader. When such a line is missing (a changed
  * shader in a newer version of one of the plugins) NO text shader is shipped: a core shader that does not compile
- * makes the client drop every server pack, so a still GUI is the safe result. The GUI then shows its still art.
+ * makes the client drop every server pack, so no shader is the safe result. Players then get the plain boss-bar popup.
  */
 public final class TextShaderMerge {
 
@@ -41,6 +41,8 @@ public final class TextShaderMerge {
     private static final String CORE = "assets/minecraft/shaders/core/text.";
     private static final String V_INCLUDE_AFTER = "#include <minecraft:projection.glsl>\n";
     private static final String V_CALL_AFTER = "gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);\n";
+    /** Radio's vertex hook replaces gl_Position, so it goes after the last line of vanilla's main(), below CCTV's. */
+    private static final String V_RADIO_CALL_AFTER = "texCoord0 = UV0;\n";
     private static final String F_INCLUDE_AFTER = "#include <minecraft:oit.glsl>\n";
     private static final String F_CALL_AFTER = "vec4 color = texColor * vertexColor * ColorModulator;\n";
 
@@ -91,11 +93,11 @@ public final class TextShaderMerge {
                 throw new IllegalStateException("the base shader already carries Radio's hooks");
             }
             vertex = insertAfter(vertex, V_INCLUDE_AFTER, "// ===== RADIO BEGIN =====\n#include <radio:radio_text_vertex.glsl>\n// ===== RADIO END =====\n");
-            vertex = insertAfter(vertex, V_CALL_AFTER, "    // ===== RADIO BEGIN =====\n    radio_text_vertex();\n    // ===== RADIO END =====\n");
+            vertex = insertAfter(vertex, V_RADIO_CALL_AFTER, "    // ===== RADIO BEGIN =====\n    radio_text_vertex(Color);\n    // ===== RADIO END =====\n");
             fragment = insertAfter(fragment, F_INCLUDE_AFTER, "// ===== RADIO BEGIN =====\n#include <radio:radio_text_fragment.glsl>\n// ===== RADIO END =====\n");
             fragment = insertAfter(fragment, F_CALL_AFTER, "    // ===== RADIO BEGIN =====\n    color = radio_text_fragment(color, texColor, vertexColor, ColorModulator);\n    // ===== RADIO END =====\n");
         } catch (IllegalStateException e) {
-            warn.accept("text shader not shipped (" + e.getMessage() + "): the radio GUI shows its still art. Update Radio, or set pack.text-shader: false to silence this.");
+            warn.accept("text shader not shipped (" + e.getMessage() + "): players get the plain boss-bar popup. Update Radio, or set pack.text-shader.enabled: false to silence this.");
             return new Result(Map.of(), "none");
         }
         files.put(CORE + "vsh", vertex.getBytes(StandardCharsets.UTF_8));

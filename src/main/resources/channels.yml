@@ -3,9 +3,8 @@
 #
 # <id>:                 lower-case letters, digits, _ and -; used in permissions: radio.channel.<id>.listen / .speak
 #   name:               display name, MiniMessage
-#   color:              #RRGGBB or a colour name (green, gold, ...); used for the channel tag and the GUI button
+#   color:              #RRGGBB or a colour name (green, gold, ...); used for the channel tag in chat and the name in the popup
 #   frequency:          free label shown next to the name, e.g. "101.5". Optional.
-#   icon:               material of the channel button in the plain GUI. Optional.
 #   glyph:              text shown before the name in messages (<glyph>), e.g. a character of a pack font. Optional.
 #   sounds:             per-channel overrides of config.yml sounds (in, out, power-on, power-off, switch). Optional.
 #     in: {key: "radio:radio.in", fallback: "minecraft:block.note_block.hat", volume: 1.0, pitch: 1.0}

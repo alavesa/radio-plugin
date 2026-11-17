@@ -14,7 +14,7 @@ error:
   no-permission: "<red>You may not do that."
   players-only: "<red>Only players can do that."
   no-radio: "<red>You need a radio. <gray>(<rule>)"
-  radio-off: "<red>Your radio is switched off. <gray>Sneak + right-click it, or /radio power."
+  radio-off: "<red>Your radio is switched off. <gray>Right-click it, or /radio power."
   no-channel: "<red>Your radio is not tuned to a channel you can use."
   unknown-channel: "<red>There is no channel <white><id></white>."
   cannot-speak: "<red>You may not speak on <channel><red>."
@@ -37,12 +37,10 @@ rule:
 power:
   on: "<green>ON"
   off: "<red>OFF"
-  switched-on: "<gray>Radio <green>on</green>."
-  switched-off: "<gray>Radio <red>off</red>."
-
-mode:
-  chat-on: "<gray>Radio chat <green>on</green>: what you type in chat goes to your radio channel while a powered radio is with you."
-  chat-off: "<gray>Radio chat <red>off</red>: use <white>/radio talk</white> or the radio's Send button."
+  switched-on: "<gray>Radio <green>on</green>. <dark_gray>Chat is transmitted on <channel><dark_gray>."
+  switched-on-no-chat: "<gray>Radio <green>on</green>. <dark_gray>Transmit with /radio say <message>."
+  switched-off: "<gray>Radio <red>off</red>. <dark_gray>Right-click the radio to switch it on."
+  volume: "<gray>Radio volume <white><volume>%</white>."
 
 channel:
   tuned: "<gray>Tuned to <channel> <dark_gray>(<frequency>)"
@@ -66,47 +64,16 @@ pack:
   status: "<gray>Resource pack: <white><status></white> <dark_gray>(delivery <delivery>)"
   resent: "<gray>Sending the resource pack again."
 
-dialog:
-  title: "<gold>Radio transmission"
-  body: "<gray>Speak on a channel. Everyone listening with a powered radio hears it."
-  message-label: "<gray>Message"
-  channel-label: "<gray>Channel"
-  send: "<green>Send"
-  cancel: "<gray>Cancel"
-
-gui:
-  # Title of the plain GUI (the transceiver GUI draws its own).
-  title: "<dark_gray>Radio <gray>» <channel>"
-  title-off: "<dark_gray>Radio <gray>» <red>off"
-  power-on: "<green>Power: ON"
-  power-off: "<red>Power: OFF"
-  power-lore: "<gray>Click to switch"
-  volume: "<yellow>Volume: <white><volume>%"
-  volume-up: "<yellow>Volume +"
-  volume-down: "<yellow>Volume −"
-  mode-dialog: "<aqua>Input: dialog"
-  mode-chat: "<aqua>Input: chat"
-  mode-lore: "<gray>Click to change how you write radio messages"
-  talk: "<green>Send a message"
-  talk-lore: "<gray>Opens the message dialog"
-  scroll-up: "<gray>▲ Up"
-  scroll-down: "<gray>▼ Down"
-  close: "<red>Close"
-  current: "<gray>Tuned: <channel>"
-  current-none: "<gray>Tuned: <red>nothing"
-  channel-name: "<channel>"
-  channel-lore:
-    - "<gray>Frequency: <white><frequency>"
-    - "<gray>Listening now: <white><listeners>"
-    - "<listen>  <speak>"
-    - "<selected>"
-  can-listen: "<green>✔ listen"
-  cannot-listen: "<red>✘ listen"
-  can-speak: "<green>✔ speak"
-  cannot-speak: "<red>✘ speak"
-  selected: "<gold>▶ Tuned"
-  not-selected: "<dark_gray>Click to tune"
-  # Text on the transceiver GUI's display line.
-  lcd-on: "<frequency> <channel>"
-  lcd-off: ""
-  lcd-no-channel: "--.- NO CHANNEL"
+# The popup. These texts are drawn in the popup's own font: capitals, digits and common punctuation only, at most 28
+# characters per line (longer lines are cut). No MiniMessage here, except in "plain".
+hud:
+  no-channel: "NO CHANNEL"
+  listeners: "<count> ON"
+  volume: "VOL <volume>"
+  no-traffic: "NO TRAFFIC"
+  hint-chat: "CHAT=TRANSMIT  <prefix>TEXT=PUBLIC"
+  hint-say: "/RADIO SAY <TEXT> TO TRANSMIT"
+  hint-listen-only: "LISTEN ONLY ON THIS CHANNEL"
+  hint-controls: "CLICK=OFF  SNEAK+CLICK=CHAN"
+  # The one-line boss bar for players without the pack (MiniMessage).
+  plain: "<gold>Radio</gold> <channel> <gray><frequency> <dark_gray>| <gray>chat = transmit, <prefix>text = public <dark_gray>| <gray>right-click = off"

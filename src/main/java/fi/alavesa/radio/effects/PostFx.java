@@ -19,8 +19,9 @@ import org.bukkit.scheduler.BukkitTask;
  * {@code Player.postEffects()}, the API behind vanilla {@code /posteffect}. Other plugins (CCTV, Lighting, Firearms)
  * share that list, so this class only ever adds and removes the ids it added itself and never clears.
  *
- * <p>Minecraft 26.3 applies post effects to the 3D frame and draws menus afterwards: an effect is visible in the
- * world and behind an open menu, never on the menu.
+ * <p>Minecraft 26.3 applies post effects to the 3D frame and draws the HUD and menus afterwards: an effect changes
+ * the world view only. The radio popup is therefore not a post effect (see hud.RadioHud); the burst is the static
+ * behind it.
  */
 public final class PostFx {
 
@@ -45,11 +46,6 @@ public final class PostFx {
         this.cfg = cfg;
     }
 
-    /** The radio GUI was opened or closed. */
-    public void gui(Player p, boolean open) {
-        set(p, cfg.postGui, open);
-    }
-
     /** A powered radio is carried (or no longer). */
     public void active(Player p, boolean on) {
         set(p, cfg.postActive, on);
@@ -64,8 +60,8 @@ public final class PostFx {
         if (old != null) old.cancel();
         burstEnd.put(p.getUniqueId(), Bukkit.getScheduler().runTaskLater(plugin, () -> {
             burstEnd.remove(p.getUniqueId());
-            // the GUI or active effect may use the same id: keep it then
-            if (!id.equals(cfg.postGui) && !id.equals(cfg.postActive)) set(p, id, false);
+            // the active effect may use the same id: keep it then
+            if (!id.equals(cfg.postActive)) set(p, id, false);
         }, cfg.postTransmissionTicks));
     }
 

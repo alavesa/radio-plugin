@@ -62,6 +62,7 @@ public final class PackService implements Listener {
     private @Nullable SamePortHttp samePort;
     /** What auto resolved to: same-port or http. */
     private String effective = "http";
+    private boolean textShader;
     /** Size and time of the other plugins' pack zips at the last build: a change means the merge is stale. */
     private String sourceSignature = "";
     /** Server tick of our last send, and how often we re-sent to stay on top, per player. */
@@ -91,6 +92,11 @@ public final class PackService implements Listener {
         http = null;
         if (samePort != null) samePort.uninstall();
         samePort = null;
+    }
+
+    /** True when the pack carries the (merged) text shader, i.e. the corner popup can be drawn. */
+    public boolean textShaderShipped() {
+        return textShader;
     }
 
     /** The delivery in use: same-port, http, url or none. */
@@ -139,15 +145,22 @@ public final class PackService implements Listener {
 
     private void rebuild() {
         try {
-            Map<String, byte[]> extra = Map.of();
+            Map<String, byte[]> extra = new java.util.LinkedHashMap<>();
             String shader = "off";
+            textShader = false;
             sourceSignature = signature();
             if (cfg.packTextShader) {
                 TextShaderMerge.Result merged = TextShaderMerge.build(resource("shaders/vanilla_text.vsh"),
                         resource("shaders/vanilla_text.fsh"), otherPack(cfg.packSuperbVehiclesZip), otherPack(cfg.packCctvZip), log::warning);
-                extra = merged.files();
+                extra.putAll(merged.files());
                 shader = merged.description();
+                textShader = !merged.files().isEmpty();
             }
+            // where the popup sits (config popup.*), read by radio_text_vertex.glsl
+            extra.put("assets/radio/shaders/include/radio_hud_config.glsl", String.format(java.util.Locale.ROOT,
+                    "// Written by the Radio plugin from config.yml (popup.*).%nconst float RADIO_HUD_SCALE = %.3f;%n"
+                            + "const float RADIO_HUD_LEFT = %.1f;%nconst vec2 RADIO_HUD_MARGIN = vec2(%d.0, %d.0);%n",
+                    cfg.popupScale, cfg.popupLeft ? 1.0 : 0.0, cfg.popupMarginX, cfg.popupMarginTop).getBytes(StandardCharsets.UTF_8));
             Path folder = cfg.packSourceFolder.isBlank() ? null : dataFolder.resolve(cfg.packSourceFolder);
             built = folder != null && Files.isDirectory(folder) ? PackBuilder.fromFolder(folder, extra)
                     : PackBuilder.fromJar(pluginJar, extra);

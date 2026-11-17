@@ -1,14 +1,14 @@
 package fi.alavesa.radio;
 
+import fi.alavesa.radio.channels.Channel;
 import fi.alavesa.radio.channels.ChannelRegistry;
 import fi.alavesa.radio.chat.ChatListener;
 import fi.alavesa.radio.chat.Transmitter;
 import fi.alavesa.radio.commands.RadioCommand;
 import fi.alavesa.radio.config.Messages;
 import fi.alavesa.radio.config.RadioConfig;
-import fi.alavesa.radio.dialog.TalkDialog;
 import fi.alavesa.radio.effects.PostFx;
-import fi.alavesa.radio.gui.MenuManager;
+import fi.alavesa.radio.hud.RadioHud;
 import fi.alavesa.radio.integration.LuckPermsHook;
 import fi.alavesa.radio.integration.VoiceChatModule;
 import fi.alavesa.radio.item.RadioItem;
@@ -18,7 +18,6 @@ import fi.alavesa.radio.item.RadioTracker;
 import fi.alavesa.radio.pack.PackService;
 import fi.alavesa.radio.permissions.Perms;
 import fi.alavesa.radio.sound.RadioSounds;
-import fi.alavesa.radio.storage.PlayerStore;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -26,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -47,13 +47,11 @@ public final class RadioPlugin extends JavaPlugin implements Listener {
     private RadioLocator locator;
     private RadioTracker tracker;
     private RadioItemListener itemListener;
-    private PlayerStore players;
     private PackService pack;
     private RadioSounds sounds;
     private PostFx postFx;
     private Transmitter transmitter;
-    private MenuManager menus;
-    private TalkDialog dialog;
+    private RadioHud hud;
     private @Nullable LuckPermsHook luckPerms;
     private @Nullable VoiceChatModule voice;
     private @Nullable BukkitTask trackerTask, menuTask, packWatchTask;
@@ -65,29 +63,25 @@ public final class RadioPlugin extends JavaPlugin implements Listener {
         perms = new Perms(getServer().getPluginManager());
         perms.sync(channels);
 
-        pack = new PackService(this, getFile(), getDataFolder().toPath(), config, (p, status) -> menus.refresh(p));
+        pack = new PackService(this, getFile(), getDataFolder().toPath(), config, (p, status) -> hud.update(p));
         sounds = new RadioSounds(config, p -> pack.loaded(p));
         postFx = new PostFx(this, config, p -> pack.loaded(p));
         item = new RadioItem(this, config, messages, channels);
         locator = new RadioLocator(item, config);
         tracker = new RadioTracker(locator, postFx, channels);
-        players = new PlayerStore(this);
-        players.loadOnline();
         transmitter = new Transmitter(this);
-        menus = new MenuManager(this);
-        dialog = new TalkDialog(this);
+        hud = new RadioHud(this);
         itemListener = new RadioItemListener(this);
         itemListener.syncRecipe();
 
         var pm = getServer().getPluginManager();
         pm.registerEvents(this, this);
         pm.registerEvents(pack, this);
-        pm.registerEvents(players, this);
-        pm.registerEvents(menus, this);
+        pm.registerEvents(hud, this);
         pm.registerEvents(itemListener, this);
         pm.registerEvents(new ChatListener(this), this);
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS,
-                e -> e.registrar().register(new RadioCommand(this).build(), "Radio: open, talk, channels, admin", List.of()));
+                e -> e.registrar().register(new RadioCommand(this).build(), "Radio: power, tune, say, channels, admin", List.of()));
 
         hookLuckPerms();
         hookVoiceChat();
@@ -102,9 +96,8 @@ public final class RadioPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        if (menus != null) menus.closeAll();
+        if (hud != null) hud.hideAll();
         if (postFx != null) postFx.clearAll();
-        if (players != null) players.saveAll();
         if (pack != null) pack.stop();
         if (itemListener != null) itemListener.removeRecipe();
         if (perms != null) perms.unregisterAll();
@@ -136,14 +129,15 @@ public final class RadioPlugin extends JavaPlugin implements Listener {
         if (trackerTask != null) trackerTask.cancel();
         if (menuTask != null) menuTask.cancel();
         trackerTask = Bukkit.getScheduler().runTaskTimer(this, tracker, 20L, 10L);
-        menuTask = Bukkit.getScheduler().runTaskTimer(this, menus, 20L, config.guiRefreshTicks);
+        // after the tracker in the same tick, so listener counts are fresh
+        menuTask = Bukkit.getScheduler().runTaskTimer(this, hud, 21L, 10L);
         if (packWatchTask == null) packWatchTask = Bukkit.getScheduler().runTaskTimer(this, () -> pack.checkSources(), 100L, 100L);
     }
 
     private void hookLuckPerms() {
         if (getServer().getPluginManager().getPlugin("LuckPerms") == null) return;
         try {
-            LuckPermsHook hook = new LuckPermsHook(this, id -> tracker.tuned(id), () -> channels.ids(), p -> menus.refresh(p));
+            LuckPermsHook hook = new LuckPermsHook(this, id -> tracker.tuned(id), () -> channels.ids(), p -> hud.update(p));
             luckPerms = hook;
             tracker.onTunedChange(hook::contextChanged);
             getLogger().info("LuckPerms found: context '" + LuckPermsHook.CONTEXT + "', live permission refresh, prefix/suffix");
@@ -178,30 +172,42 @@ public final class RadioPlugin extends JavaPlugin implements Listener {
         if (voice != null) voice.enabled(config.voiceEnabled);
         startTasks();
         tracker.run();
-        menus.refreshAll();
+        hud.refreshAll();
         for (String problem : problems) getLogger().warning(problem);
         return problems;
     }
 
-    /** Channels were edited in game: permissions, contexts and open menus follow. */
+    /** Channels were edited in game: permissions, contexts and popups follow. */
     public void channelsChanged() {
         perms.sync(channels);
         tracker.run();
-        menus.refreshAll();
+        hud.refreshAll();
     }
 
-    /**
-     * Switches a radio on or off (or to {@code power} when given), with the click sound.
-     */
+    /** Switches a radio on or off (or to {@code power} when given), with the click sound; the popup follows. */
     public void togglePower(Player p, RadioLocator.Found radio, @Nullable Boolean power) {
         boolean on = power != null ? power : !radio.state().power();
-        if (on != radio.state().power()) {
-            RadioItem.State s = locator.update(p, radio, radio.state().withPower(on)).state();
+        RadioItem.State s = radio.state();
+        if (on != s.power()) {
+            s = locator.update(p, radio, s.withPower(on)).state();
             sounds.play(p, on ? "power-on" : "power-off", channels.get(s.channel()), Math.max(s.volume(), 30));
             tracker.run();
         }
-        messages.send(p, on ? "power.switched-on" : "power.switched-off");
-        menus.refresh(p);
+        Channel c = channels.get(s.channel());
+        if (!on) messages.send(p, "power.switched-off");
+        else if (config.radioChat && c != null) messages.send(p, "power.switched-on", Placeholder.component("channel", c.displayName()));
+        else messages.send(p, "power.switched-on-no-chat");
+        hud.update(p);
+    }
+
+    /** Tunes a radio to a channel the player may listen to or speak on. */
+    public void tune(Player p, RadioLocator.Found radio, Channel c) {
+        RadioItem.State s = locator.update(p, radio, radio.state().withChannel(c.id())).state();
+        sounds.play(p, "switch", c, Math.max(s.volume(), 30));
+        messages.send(p, "channel.tuned", Placeholder.component("channel", c.displayName()),
+                Placeholder.unparsed("frequency", c.frequency().isEmpty() ? "-" : c.frequency()));
+        tracker.run();
+        hud.update(p);
     }
 
     /** {prefix, suffix} from LuckPerms, or two empty strings. */
@@ -223,11 +229,9 @@ public final class RadioPlugin extends JavaPlugin implements Listener {
     public RadioItem item() { return item; }
     public RadioLocator locator() { return locator; }
     public RadioTracker tracker() { return tracker; }
-    public PlayerStore players() { return players; }
     public PackService pack() { return pack; }
     public RadioSounds sounds() { return sounds; }
     public PostFx postFx() { return postFx; }
     public Transmitter transmitter() { return transmitter; }
-    public MenuManager menus() { return menus; }
-    public TalkDialog dialog() { return dialog; }
+    public RadioHud hud() { return hud; }
 }

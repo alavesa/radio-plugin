@@ -2,15 +2,18 @@
 #extension GL_ARB_separate_shader_objects : require
 
 // =====================================================================================================================
-// Radio signal effect (radio:gui, radio:burst, radio:active): static noise, vignette and chromatic aberration over
-// the 3D view. The three post_effect JSONs use this one shader with different strengths (RadioConfig).
-// Minecraft draws menus AFTER post effects, so this never touches a GUI, only the world behind it.
+// Radio signal effect (radio:burst, radio:active): static noise, vignette and chromatic aberration over the 3D view.
+// The post_effect JSONs use this one shader with different strengths (RadioConfig). radio:burst is confined to the
+// top-right corner, behind the radio popup.
+// A post effect cannot draw the popup itself: Minecraft draws the HUD AFTER post effects, a post shader gets no
+// text and does not know the GUI scale. The popup is drawn by the text shader (shaders/include/radio_text_*.glsl).
 // =====================================================================================================================
 
 const float NOISE_BLOCK_PX = 2.0;       // grain size of the static, screen pixels
 const float NOISE_RATE = 30.0;          // how often the static re-rolls, per second
 const float LINE_CHANCE = 0.012;        // chance per pixel row and roll of a bright interference line, times Noise
 const float VIGNETTE_INNER = 0.35;      // distance from the centre where the vignette starts (0.707 = the corners)
+const float CORNER_REACH = 0.85;         // radius of the corner mask, in screen heights
 const float ABERRATION_PX = 6.0;        // red/blue split at the screen edge at Aberration 1, screen pixels
 
 uniform sampler2D InSampler;
@@ -35,6 +38,7 @@ layout(std140) uniform RadioConfig {
     float Noise;        // 0..1 static mixed over the picture
     float Vignette;     // 0..1 darkening toward the corners
     float Aberration;   // 0..1 colour fringing toward the edges
+    float Corner;       // 0 = the whole screen, 1 = only around the top-right corner (where the radio popup sits)
 };
 
 layout(location = 0) in vec2 texCoord;
@@ -52,17 +56,19 @@ void main() {
     vec2 px = texCoord * OutSize;
     vec2 fromCentre = texCoord - 0.5;
     float r = length(fromCentre);
+    // texCoord (1,1) is the top-right corner of the screen
+    float mask = mix(1.0, smoothstep(CORNER_REACH, 0.0, length((texCoord - vec2(1.0)) * vec2(OutSize.x / OutSize.y, 1.0))), Corner);
 
     // chromatic aberration: red and blue sampled a little further out / in than green, growing toward the edges
-    vec2 split = fromCentre * (ABERRATION_PX * Aberration * r * 2.0) / OutSize;
+    vec2 split = fromCentre * (ABERRATION_PX * Aberration * mask * r * 2.0) / OutSize;
     vec3 col = vec3(texture(InSampler, texCoord + split).r, texture(InSampler, texCoord).g, texture(InSampler, texCoord - split).b);
 
     float roll = floor(t * NOISE_RATE);
     float grain = hash12(floor(px / NOISE_BLOCK_PX) + roll * vec2(131.0, 71.0));
-    col = mix(col, vec3(grain), Noise * 0.6);
-    float line = step(1.0 - LINE_CHANCE * Noise, hash12(vec2(floor(px.y / NOISE_BLOCK_PX), roll)));
+    col = mix(col, vec3(grain), Noise * 0.6 * mask);
+    float line = mask * step(1.0 - LINE_CHANCE * Noise, hash12(vec2(floor(px.y / NOISE_BLOCK_PX), roll)));
     col += line * 0.25;
 
-    col *= 1.0 - Vignette * smoothstep(VIGNETTE_INNER, 0.75, r);
+    col *= 1.0 - Vignette * mix(smoothstep(VIGNETTE_INNER, 0.75, r), mask * 0.6, Corner);
     fragColor = vec4(col, 1.0);
 }

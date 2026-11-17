@@ -18,7 +18,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A snapshot, refreshed every few ticks on the main thread, of who listens to which channel. It feeds the things that
- * must not scan inventories themselves: the GUI's listener counts, the LuckPerms context and the voice module (both
+ * must not scan inventories themselves: the popup's listener counts, the LuckPerms context and the voice module (both
  * of which are called from other threads, hence the concurrent/immutable views).
  */
 public final class RadioTracker implements Runnable {

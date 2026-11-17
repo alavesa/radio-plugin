@@ -22,7 +22,7 @@ import org.bukkit.plugin.Plugin;
  * <ul>
  *   <li>Context {@code radio-channel=<id>}: the channel of the player's powered radio, so permissions can be scoped
  *       ("/lp user X permission set some.node true radio-channel=security").</li>
- *   <li>{@code UserDataRecalculateEvent}: when a player's permissions change, their open radio GUI is refreshed.</li>
+ *   <li>{@code UserDataRecalculateEvent}: when a player's permissions change, their radio popup is refreshed.</li>
  *   <li>Prefix and suffix for radio messages.</li>
  * </ul>
  */

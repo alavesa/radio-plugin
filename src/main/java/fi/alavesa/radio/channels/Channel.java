@@ -14,7 +14,7 @@ import org.bukkit.Material;
  * @param id         permission-safe id (a-z, 0-9, _ and -)
  * @param name       display name, MiniMessage
  * @param frequency  free label such as "101.5", may be empty
- * @param icon       button material in the plain GUI
+ * @param icon       a material for the channel (not shown anywhere since the popup replaced the chest GUI; kept so old files load)
  * @param glyph      text shown before the name in messages, may be empty
  * @param sounds     sound events this channel overrides, already merged with the global sound (event -> sound)
  * @param rawSounds  the overrides exactly as written in channels.yml, kept so saving does not lose them
@@ -28,7 +28,7 @@ public record Channel(String id, String name, TextColor color, String frequency,
         return Messages.MM.deserialize(name).colorIfAbsent(color);
     }
 
-    /** The name without any formatting (for the GUI's display line and the console). */
+    /** The name without any formatting (for the popup and the console). */
     public String plainName() {
         return PlainTextComponentSerializer.plainText().serialize(Messages.MM.deserialize(name));
     }

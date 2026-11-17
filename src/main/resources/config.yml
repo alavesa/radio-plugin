@@ -1,11 +1,6 @@
-# Radio: handheld radios with channels, a transceiver GUI, sounds and screen effects.
+# Radio: handheld radios with channels, a popup in the corner of the screen, sounds and signal effects.
 # /radio reload re-reads this file, channels.yml and messages.yml. Invalid values fall back to the defaults below
 # with a warning in the console.
-
-# How players write radio messages unless they chose otherwise (/radio chat, or the button in the radio GUI):
-#   dialog  a native dialog with a text box and a channel selector
-#   chat    normal chat goes to the radio channel while a powered radio is carried
-default-mode: dialog
 
 radio:
   # When does a carried radio work (receive and transmit)?
@@ -30,7 +25,9 @@ item:
     - "<gray>Channel: <channel> <dark_gray>(<frequency>)"
     - "<gray>Power: <power>  <gray>Volume: <white><volume>%"
     - ""
-    - "<dark_gray>Right-click: open  •  Sneak + right-click: power"
+    - "<dark_gray>Right-click: on / off"
+    - "<dark_gray>Sneak + right-click: next channel"
+    - "<dark_gray>While it is on, type in chat to transmit"
   # item_model from the resource pack. Empty = keep the base material's own model.
   # Players WITHOUT the pack see the missing-model cube for a custom item_model; set this to "" if the pack is optional
   # and that bothers you.
@@ -49,7 +46,13 @@ item:
       N: NOTE_BLOCK
 
 chat:
-  # Longest radio message, in characters. Longer messages are refused (dialog: the text box stops there).
+  # While a powered radio is with the player, what they type in chat is transmitted on the radio's channel instead of
+  # going to public chat. false = chat stays public; transmit with /radio say <message>.
+  radio-chat: true
+  # With radio-chat on, a chat message that starts with this goes to public chat as usual (without the prefix).
+  # "" = no way around: switch the radio off to chat publicly.
+  public-prefix: "!"
+  # Longest radio message, in characters. Longer messages are refused.
   max-length: 200
   # Minimum time between two transmissions of one player, milliseconds. 0 = no cooldown.
   cooldown-ms: 1500
@@ -70,23 +73,32 @@ sounds:
   power-off: {key: "radio:radio.power_off", fallback: "minecraft:block.lever.click",           volume: 0.7, pitch: 0.9}
   switch:    {key: "radio:radio.switch",    fallback: "minecraft:ui.button.click",             volume: 0.5, pitch: 1.5}
   # Ticks between the "in" sound (transmission starts) and the "out" sound (roger beep). 20 ticks = 1 second.
-  out-delay-ticks: 14
+  out-delay-ticks: 16
 
-gui:
-  # Use the transceiver GUI (custom art from the pack) for players whose client loaded the pack. Everyone else, and
-  # everyone when this is false, gets the plain chest GUI with the same buttons.
-  fancy: true
-  # How often open radio GUIs refresh their listener counts, ticks.
-  refresh-ticks: 20
+popup:
+  # The radio popup in the corner of the screen: channel, your name, the latest radio messages and what to do. It is
+  # there while a powered radio is with the player and gone when the radio is off. It needs the resource pack.
+  enabled: true
+  # right or left side of the screen.
+  side: right
+  # Size: 1.0 = one popup pixel per GUI pixel (176 x 104). 0.5 - 2.0.
+  scale: 1.0
+  # Distance from the side edge and from the top of the screen, GUI pixels. Vanilla draws potion effect icons in the
+  # top-right corner (two rows, 52 px); raise margin-top to 56 to sit below them.
+  margin-x: 4
+  margin-top: 4
+  # Players without the pack (or when the text shader could not be merged) get a one-line boss bar instead, and read
+  # radio messages in chat. false = no bar for them.
+  plain-fallback: true
+  # Also print radio messages in chat for players who see the popup. The popup shows the last 5 lines only.
+  messages-in-chat: false
 
 post-effects:
   # Screen effects from the pack (static noise, vignette, chromatic aberration), per player. They need the pack and a
-  # 26.3 client. NOTE: post effects change the 3D view only. Minecraft draws menus on top afterwards, so with the GUI
-  # open the effect is visible on the world BEHIND the menu, not on the menu itself.
+  # 26.3 client. NOTE: post effects change the 3D view only; the HUD is drawn on top afterwards. They cannot draw the
+  # popup (no text, no GUI scale): the popup is drawn by the text shader, the burst is the static behind it.
   enabled: true
-  # While the radio GUI is open. "" = none.
-  gui: "radio:gui"
-  # A short burst for every listener when a transmission comes in. "" = none.
+  # A short burst of static around the top-right corner for every listener when a transmission comes in. "" = none.
   transmission: "radio:burst"
   transmission-ticks: 10
   # All the time while a powered radio is carried (see radio.works-when). "" = none. Try "radio:active".
@@ -104,19 +116,18 @@ pack:
   # SHA-1 of the zip the plugin built is used.
   url: ""
   sha1: ""
-  # Kick players who decline the pack? When false they get the plain GUI and vanilla sounds.
+  # Kick players who decline the pack? When false they get the plain one-line bar and vanilla sounds.
   required: false
-  prompt: "<gold>Radio</gold> <gray>adds the transceiver screen, radio sounds and signal effects."
+  prompt: "<gold>Radio</gold> <gray>adds the radio popup, radio sounds and signal effects."
   # The host name players' clients download from. Empty = the address each player typed to connect.
   public-host: ""
   http:
     bind: "0.0.0.0"
     port: 8129
-  # The animated parts of the transceiver GUI (moving waveform, lamp glow, display scanlines) are drawn by Minecraft's
-  # text shader (core/text). Only ONE pack's copy of that shader runs, and SuperbVehicles and CCTV replace it too. So
+  # The popup is put in the screen corner by Minecraft's text shader (core/text). Only ONE pack's copy of that shader runs, and SuperbVehicles and CCTV replace it too. So
   # Radio does not ship its own: it takes the text shader from those plugins' packs (paths below, inside plugins/),
   # adds its hooks and ships the merged shader. Without those plugins it starts from the vanilla shader. The merge is
-  # redone when their pack files change. false = no text shader at all (the GUI keeps its still art).
+  # redone when their pack files change. false = no text shader at all (everyone gets the plain one-line bar).
   text-shader:
     enabled: true
     superbvehicles-pack: "SuperbVehicles/pack/SuperbVehicles-hud.zip"

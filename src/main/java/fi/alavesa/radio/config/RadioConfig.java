@@ -17,13 +17,9 @@ public final class RadioConfig {
     /** When a carried radio works. */
     public enum Carry { HELD, HOTBAR, INVENTORY }
 
-    /** How a player writes radio messages. */
-    public enum Mode { DIALOG, CHAT }
-
     /** The sound events of config.yml {@code sounds} (and of a channel's overrides). */
     public static final List<String> SOUND_EVENTS = List.of("in", "out", "power-on", "power-off", "switch");
 
-    public final Mode defaultMode;
     public final Carry carry;
     public final int defaultVolume, volumeStep;
     public final boolean defaultPower;
@@ -37,16 +33,18 @@ public final class RadioConfig {
 
     public final int maxLength, maxPerMinute;
     public final long cooldownMs;
-    public final boolean logToConsole, luckPermsMeta;
+    public final boolean logToConsole, luckPermsMeta, radioChat;
+    public final String publicPrefix;
 
     public final Map<String, SoundSpec> sounds;
     public final int outDelayTicks;
 
-    public final boolean guiFancy;
-    public final int guiRefreshTicks;
+    public final boolean popupEnabled, popupLeft, popupPlainFallback, popupMessagesInChat;
+    public final double popupScale;
+    public final int popupMarginX, popupMarginTop;
 
     public final boolean postEnabled;
-    public final String postGui, postTransmission, postActive;
+    public final String postTransmission, postActive;
     public final int postTransmissionTicks;
 
     public final String packDelivery, packUrl, packSha1, packPrompt, packPublicHost, packHttpBind, packSourceFolder;
@@ -57,7 +55,6 @@ public final class RadioConfig {
     public final boolean voiceEnabled;
 
     public RadioConfig(FileConfiguration c, Consumer<String> warn) {
-        defaultMode = enumOf(Mode.class, c.getString("default-mode", "dialog"), Mode.DIALOG, "default-mode", warn);
         carry = enumOf(Carry.class, c.getString("radio.works-when", "hotbar"), Carry.HOTBAR, "radio.works-when", warn);
         defaultVolume = clamp(c.getInt("radio.default-volume", 80), 0, 100);
         volumeStep = clamp(c.getInt("radio.volume-step", 10), 1, 100);
@@ -86,19 +83,27 @@ public final class RadioConfig {
         maxPerMinute = Math.max(0, c.getInt("chat.max-per-minute", 20));
         logToConsole = c.getBoolean("chat.log-to-console", true);
         luckPermsMeta = c.getBoolean("chat.luckperms-meta", true);
+        radioChat = c.getBoolean("chat.radio-chat", true);
+        publicPrefix = c.getString("chat.public-prefix", "!").strip();
 
         Map<String, SoundSpec> s = new LinkedHashMap<>();
         for (String event : SOUND_EVENTS) {
             s.put(event, SoundSpec.read(c.getConfigurationSection("sounds." + event), SoundSpec.SILENT, "sounds." + event, warn));
         }
         sounds = Map.copyOf(s);
-        outDelayTicks = clamp(c.getInt("sounds.out-delay-ticks", 14), 1, 200);
+        outDelayTicks = clamp(c.getInt("sounds.out-delay-ticks", 16), 1, 200);
 
-        guiFancy = c.getBoolean("gui.fancy", true);
-        guiRefreshTicks = clamp(c.getInt("gui.refresh-ticks", 20), 5, 1200);
+        popupEnabled = c.getBoolean("popup.enabled", true);
+        String side = c.getString("popup.side", "right").trim().toLowerCase(Locale.ROOT);
+        if (!side.equals("right") && !side.equals("left")) warn.accept("popup.side: unknown value '" + side + "', using right");
+        popupLeft = side.equals("left");
+        popupScale = Math.max(0.5, Math.min(2.0, c.getDouble("popup.scale", 1.0)));
+        popupMarginX = clamp(c.getInt("popup.margin-x", 4), 0, 1000);
+        popupMarginTop = clamp(c.getInt("popup.margin-top", 4), 0, 1000);
+        popupPlainFallback = c.getBoolean("popup.plain-fallback", true);
+        popupMessagesInChat = c.getBoolean("popup.messages-in-chat", false);
 
         postEnabled = c.getBoolean("post-effects.enabled", true);
-        postGui = key(c.getString("post-effects.gui", ""), "post-effects.gui", warn);
         postTransmission = key(c.getString("post-effects.transmission", ""), "post-effects.transmission", warn);
         postActive = key(c.getString("post-effects.active", ""), "post-effects.active", warn);
         postTransmissionTicks = clamp(c.getInt("post-effects.transmission-ticks", 10), 1, 200);

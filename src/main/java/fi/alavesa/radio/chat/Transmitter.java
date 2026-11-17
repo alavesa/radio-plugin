@@ -92,14 +92,15 @@ public final class Transmitter {
             // the sender always gets their own transmission back, even on a speak-only channel
             if (heard == null && !listener.equals(sender)) continue;
             int volume = heard != null ? heard : radio.state().volume();
-            if (hasLine) listener.sendMessage(line);
+            plugin.hud().message(listener, sender, message);
+            // the popup shows the message; chat carries it for players without the popup (or when configured)
+            if (hasLine && (cfg.popupMessagesInChat || !plugin.hud().fancy(listener))) listener.sendMessage(line);
             plugin.sounds().play(listener, "in", channel, volume);
             plugin.postFx().burst(listener);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (listener.isOnline()) plugin.sounds().play(listener, "out", channel, volume);
             }, cfg.outDelayTicks);
         }
-        plugin.menus().onAir(channel, cfg.outDelayTicks + 10);
         if (cfg.logToConsole) {
             Bukkit.getConsoleSender().sendMessage(msg.get("format.console", Placeholder.unparsed("id", channel.id()),
                     Placeholder.unparsed("sender", sender.getName()), Placeholder.unparsed("message", message)));

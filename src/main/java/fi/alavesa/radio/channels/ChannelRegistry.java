@@ -33,7 +33,7 @@ public final class ChannelRegistry {
     public static final Pattern ID = Pattern.compile("[a-z0-9_-]{1,32}");
     private static final String HEADER = """
             # Radio channels. Edit here and run /radio reload, or use /radio channel ... in game (this file is rewritten then).
-            # <id>: name (MiniMessage), color (#RRGGBB or a name), frequency (label), icon (material, plain GUI),
+            # <id>: name (MiniMessage), color (#RRGGBB or a name), frequency (label),
             #       glyph (text before the name in messages), sounds (overrides of config.yml sounds).
             # The channel "global" always exists. Permissions: radio.channel.<id>.listen / .speak
             """;

@@ -2,7 +2,7 @@ name: Radio
 version: '${version}'
 main: fi.alavesa.radio.RadioPlugin
 api-version: '26.3'
-description: Handheld radios with channels, a transceiver GUI, sounds and signal effects
+description: Handheld radios with channels, a popup in the screen corner, sounds and signal effects
 softdepend: [LuckPerms, voicechat]
 author: Piia Alavesa
 

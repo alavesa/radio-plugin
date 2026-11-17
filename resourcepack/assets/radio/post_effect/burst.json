@@ -18,15 +18,20 @@
           {
             "name": "Noise",
             "type": "float",
-            "value": 0.45
+            "value": 0.6
           },
           {
             "name": "Vignette",
             "type": "float",
-            "value": 0.25
+            "value": 0.35
           },
           {
             "name": "Aberration",
+            "type": "float",
+            "value": 1.0
+          },
+          {
+            "name": "Corner",
             "type": "float",
             "value": 1.0
           }

@@ -1,77 +1,49 @@
 # Radio
 
-Handheld radios for Paper 26.3 (Minecraft 26.3, Java 25): admin-defined channels with per-channel permissions, a
-transceiver GUI, a message dialog or radio chat, radio sounds and per-player signal effects. The plugin carries its
-own resource pack and serves it on the Minecraft port.
+Handheld radios for Paper 26.3 (Minecraft 26.3, Java 25): admin-defined channels with per-channel permissions, a radio
+popup in the corner of the screen, radio chat, radio sounds and signal effects. The plugin carries its own resource
+pack and serves it on the Minecraft port.
 
-![The transceiver GUI with the ON AIR lamp lit](docs/gui-on-air.png)
+![The radio popup in the top-right corner](docs/popup.png)
 
-Status of 0.1.0: see [What is verified](#what-is-verified).
+## How it plays
+
+- **Right-click the radio**: on / off. The popup is there while the radio is on and gone when it is off.
+- **Sneak + right-click**: next channel.
+- **While it is on, type in chat**: the message is transmitted on the radio's channel. `!text` goes to public chat
+  as usual (`chat.public-prefix`).
+- The popup shows the channel, your name, how many are listening, the volume, the last radio messages and these
+  controls. While a transmission comes in the lamp lights and the panel shows static
+  ([picture](docs/popup-receiving.png)).
+- A player hears a channel when they carry a powered radio tuned to it (`radio.works-when`: held, hotbar or
+  inventory) and have the listen permission.
+
+Players without the resource pack get a one-line boss bar instead of the popup and read radio messages in chat.
 
 ## Build and install
 
 ```
-./gradlew build          # needs a JDK 25 or newer; the jar is build/libs/radio-0.1.0.jar
+./gradlew build          # needs a JDK 25 or newer; the jar is build/libs/radio-0.2.0.jar
 ```
 
-Put the jar in `plugins/` and start the server. Delete any older Radio jar first: Paper loads the first jar with the
-same plugin name. LuckPerms and Simple Voice Chat are optional.
+Put the jar in `plugins/` and restart. Delete any older Radio jar first: Paper loads the first jar with the same
+plugin name. LuckPerms and Simple Voice Chat are optional.
 
-`python3 tools/gen_pack.py` regenerates the placeholder art, font, item models and sounds (sounds need `ffmpeg`).
+`python3 tools/gen_pack.py` regenerates the placeholder art, font, item model and sounds (sounds need `ffmpeg`).
 `tools/zip_pack.sh` zips `resourcepack/` and prints the SHA-1.
-
-## Architecture
-
-| Package | What it does |
-|---|---|
-| `RadioPlugin` | wiring, reload |
-| `config` | `RadioConfig` (config.yml snapshot with validation), `Messages` (messages.yml, MiniMessage) |
-| `channels` | `Channel`, `ChannelRegistry` (channels.yml, saved asynchronously) |
-| `permissions` | `Perms`: registers `radio.channel.<id>.*` nodes with their defaults |
-| `item` | `RadioItem` (PDC state), `RadioLocator` (which carried radios work), `RadioTracker` (who hears what, refreshed every 10 ticks), `RadioItemListener` (right-click, recipe) |
-| `chat` | `Transmitter` (checks, rate limit, delivery), `ChatListener` (radio chat) |
-| `dialog` | `TalkDialog` (Paper Dialog API) |
-| `gui` | `RadioMenu` (one open menu), `MenuManager` (clicks, refresh), `MenuTitle` (the art as a font title) |
-| `sound` | `RadioSounds`: pack sound or vanilla fallback, per listener |
-| `effects` | `PostFx`: per-player post effects through `Player.postEffects()` |
-| `pack` | `PackBuilder`, `PackService`, `SamePortHttp`, `PackHttpServer` (same code as SuperbVehicles/CCTV/Lighting), `TextShaderMerge` |
-| `storage` | `PlayerStore`: per-player input mode |
-| `integration` | `LuckPermsHook`, `VoiceChatModule` (experimental); only loaded when those plugins are installed |
-| `commands` | `RadioCommand` (Brigadier, `LifecycleEvents.COMMANDS`) |
-
-```
-build.gradle.kts  settings.gradle.kts
-src/main/resources/   plugin.yml config.yml channels.yml messages.yml
-src/main/java/fi/alavesa/radio/...
-resourcepack/         pack.mcmeta (pack_format 97)
-  assets/radio/font/gui.json            panel + lamps as bitmap glyphs, negative-space characters
-  assets/radio/textures/font/*.png      panel 208x256, scope, on_air, led
-  assets/radio/items|models|textures/item/...   the radio and the GUI buttons
-  assets/radio/sounds.json  sounds/radio/*.ogg  lang/en_us.json
-  assets/radio/post_effect/{gui,burst,active}.json  shaders/post/radio_fx.fsh
-  assets/radio/shaders/include/radio_text_{vertex,fragment}.glsl  radio_layout.glsl (generated)
-  (assets/minecraft/shaders/core/text.vsh|fsh are NOT in the folder: the plugin merges them at startup, see below)
-tools/                gen_pack.py  zip_pack.sh  validate_shaders.py
-```
-
-The state of a radio (channel, power, volume) is stored on the item. A player hears a channel when they carry a
-powered radio tuned to it (`radio.works-when`: held, hotbar or inventory) and have the listen permission.
 
 ## Commands
 
 | Command | Permission |
 |---|---|
-| `/radio` open the GUI | `radio.use` |
-| `/radio talk` open the message dialog | `radio.use` |
-| `/radio say <message>` | `radio.use` |
-| `/radio chat` toggle radio chat (input mode chat/dialog, remembered per player) | `radio.use` |
-| `/radio power [on\|off]` | `radio.use` |
+| `/radio` or `/radio power [on\|off]` | `radio.use` |
+| `/radio tune <channel>` | `radio.use` |
+| `/radio volume <0-100>` | `radio.use` |
+| `/radio say <message>` transmit once | `radio.use` |
 | `/radio pack` pack status, resend | `radio.use` |
 | `/radio give <players> [amount]` | `radio.give` |
 | `/radio channel create\|delete\|rename\|color\|frequency\|list` | `radio.admin` |
 | `/radio reload` | `radio.reload` |
-
-Right-click the radio to open it; sneak + right-click toggles the power.
 
 ## Permissions and LuckPerms
 
@@ -84,14 +56,58 @@ Per channel: `radio.channel.<id>.listen`, `radio.channel.<id>.speak`, `radio.cha
 /radio channel frequency security 144.8
 /lp group guard permission set radio.channel.security.* true
 /lp group default permission set radio.channel.security.listen true
-/lp user Steve permission set radio.channel.global.speak false
 /lp user Steve permission set essentials.fly true radio-channel=security
 ```
 
 With LuckPerms installed the plugin registers the context `radio-channel=<id>` (the channel of the player's powered
-radio), refreshes open radio GUIs when permissions change (`UserDataRecalculateEvent`), and can show the prefix and
-suffix in radio messages (`<prefix>`, `<suffix>` in messages.yml; `chat.luckperms-meta`). Without LuckPerms the same
-nodes work through any Bukkit permission plugin.
+radio), refreshes the popup when permissions change, and can show the prefix and suffix in the chat form of radio
+messages (`<prefix>`, `<suffix>` in messages.yml).
+
+## How the popup is drawn
+
+The request was a popup made with post effects. A post effect cannot do that on its own: Minecraft applies post
+effects to the 3D view and draws the HUD afterwards, and a post shader gets no text and does not know the GUI scale.
+So:
+
+- The popup is the **name of a boss bar** (one per player, blue, progress 0), written in the font `radio:hud`. The
+  font is monospace by construction and has signed space characters, so `HudText` can place every character; the
+  whole name is 0 px wide, which puts its origin at the screen centre.
+- The **text shader** (`minecraft:core/text`) moves glyphs marked with the text colour `#FEFBxx` from the centre to
+  the corner and onto their line, colours them from a palette of eight, and animates the panel (scanlines, rolling
+  bar, static and lamp while a transmission comes in).
+- The pack makes the blue boss bar graphic transparent. No vanilla mob has a blue bar; another plugin's blue boss
+  bars would lose their bar for players with this pack.
+- **Post effects** add the burst of static around the top-right corner when a transmission comes in
+  (`post-effects.transmission`), per player through `Player.postEffects()`.
+
+The popup font has capitals, digits, common punctuation and Ä Ö Å Ü É. Lower case is shown as upper case, anything
+else as `?`. Set `popup.messages-in-chat: true` if players should also get the full text in chat.
+
+`popup.side`, `popup.scale`, `popup.margin-x` and `popup.margin-top` move and size it. Vanilla draws potion effect
+icons in the same corner; `margin-top: 56` puts the popup below them.
+
+### The text shader is shared with SuperbVehicles and CCTV
+
+Only one pack's copy of a core shader runs (the pack pushed last), and SuperbVehicles and CCTV replace the same
+shader. So the pack folder has no `text.vsh/fsh`. At startup `TextShaderMerge` takes the text shader from
+`plugins/SuperbVehicles/pack/SuperbVehicles-hud.zip`, else from `plugins/CCTV/cctv-pack.zip`, else the vanilla 26.3
+files inside the jar; adds CCTV's hooks if they are missing; adds the Radio hooks; and copies the other plugins'
+include files along. The merge is redone when those zips change. Neither other plugin needs changes.
+
+- Radio sends its pack 40 ticks after join (`pack.send-delay-ticks`) and again when another pack is pushed after it,
+  so its merged shader stays on top.
+- If a line the hooks attach to is missing (a future version of one of the plugins changed its shader), no text
+  shader is shipped and the console says so. Everyone then gets the plain one-line bar. A core shader that fails to
+  compile makes the client drop every server pack, so this is the safe direction.
+- With `pack.source-folder` or a self-hosted pack, take the merged shader from `plugins/Radio/radio-pack.zip`.
+
+After changing a shader, validate it BEFORE any client loads it:
+
+```
+python3 tools/validate_shaders.py <glslang> <unzipped radio-pack>/assets,<26.3 client assets> text.vsh text.fsh -DIS_GUI
+```
+
+Run it without defines and with `-DIS_SEE_THROUGH` and `-DIS_GRAYSCALE` too.
 
 ## Resource pack
 
@@ -102,80 +118,61 @@ Pack format 97 (Minecraft 26.3 only). `pack.delivery`:
 - `url`: host `plugins/Radio/radio-pack.zip` yourself, set `pack.url` and `pack.sha1`.
 - `none`: you merged the pack into another one.
 
-It is sent as an additional pack with a fixed id, so the server's own pack keeps working. Players whose client did
-not load it get the plain chest GUI and vanilla sounds. They also see the missing-model cube for the radio item unless
-`item.model` is set to `""`.
-
-### The text shader, shared with SuperbVehicles and CCTV
-
-The moving waveform, the lamp glow and the display's scanlines and static are drawn by Minecraft's text shader
-(`minecraft:core/text`). Only one pack's copy of a core shader runs (the pack pushed last), and SuperbVehicles and
-CCTV replace the same shader. So the pack folder has no `text.vsh/fsh`. At startup `TextShaderMerge` takes the text
-shader from `plugins/SuperbVehicles/pack/SuperbVehicles-hud.zip`, else from `plugins/CCTV/cctv-pack.zip`, else the
-vanilla 26.3 files inside the jar; adds CCTV's hooks if they are missing; adds the Radio hooks; and copies the other
-plugins' include files along. The merge is redone when those zips change. Neither other plugin needs changes.
-
-- Radio sends its pack 40 ticks after join (`pack.send-delay-ticks`) and again when another pack is pushed after it,
-  so its merged shader stays on top.
-- If a line the hooks attach to is missing (a future version of one of the plugins changed its shader), no text
-  shader is shipped and the console says so. The GUI then shows its still art. A core shader that fails to compile
-  makes the client drop every server pack, so this is the safe direction.
-- Marked glyphs use text colour `#FEFCxx` (xx = 255 - effect kind) and texel alpha 253. The colour is nearly white,
-  so if another pack's text shader wins anyway, the glyphs are drawn as their still pictures.
-- `pack.text-shader.enabled: false` turns all of this off.
-- With `pack.source-folder` or a self-hosted pack, take the merged shader from `plugins/Radio/radio-pack.zip`.
-
-After changing a shader, validate before shipping:
-
-```
-python3 tools/validate_shaders.py <glslang> <unzipped radio-pack>/assets,<26.3 client assets> text.vsh text.fsh -DIS_GUI
-```
-
-Run it without defines and with `-DIS_SEE_THROUGH` and `-DIS_GRAYSCALE` too.
+It is sent as an additional pack with a fixed id, so the server's own pack keeps working. Players without it see the
+missing-model cube for the radio item unless `item.model` is set to `""`.
 
 ### Replacing the art
 
-Everything `tools/gen_pack.py` writes is a placeholder. Replace a PNG with one of the same size:
-`textures/font/panel.png` is 208x256 and is drawn 16 px left of and 34 px above the 176x222 chest container; its
-right-most pixel column must contain at least one opaque pixel. The small glyphs (`scope`, `on_air`, `led`, `lcd`)
-keep their picture at the top of a taller transparent image, and every drawn pixel in them has alpha 253 (the shader
-marker; `gen_pack.py` sets it). If you move them, change `GLYPHS` in `gen_pack.py` and the
-constants in `MenuTitle.java` together. Button icons are 16x16 in `textures/item/gui/`; `channel.png` is tinted with
-the channel colour, `channel_overlay.png` is not. Sounds are Ogg Vorbis in `sounds/radio/`.
+Everything `tools/gen_pack.py` writes is a placeholder. `textures/font/panel.png` (176x104) is the popup's
+background; translucent pixels are treated as glass and get the scanlines and static, opaque ones stay as drawn, and
+its right-most column must be opaque. `lamp.png` is the lit lamp, as tall as the panel. `hud.png` is the font sheet
+(5x8 cells); each cell keeps a nearly transparent pixel in its last column, which is what makes the font monospace.
+If the geometry changes, change it in `gen_pack.py` (it writes `radio_layout.glsl`) and in `HudText.java` together.
+Sounds are Ogg Vorbis in `sounds/radio/`.
+
+## Code map
+
+| Package | What it does |
+|---|---|
+| `RadioPlugin` | wiring, reload, power and tune |
+| `config` | `RadioConfig` (config.yml snapshot with validation), `Messages` (messages.yml, MiniMessage) |
+| `channels` | `Channel`, `ChannelRegistry` (channels.yml, saved asynchronously) |
+| `permissions` | `Perms`: registers `radio.channel.<id>.*` nodes with their defaults |
+| `item` | `RadioItem` (PDC state: channel, power, volume), `RadioLocator`, `RadioTracker`, `RadioItemListener` |
+| `hud` | `RadioHud` (the boss bar per player, message log), `HudText` (layout and markers) |
+| `chat` | `Transmitter` (checks, rate limit, delivery), `ChatListener` (radio chat) |
+| `sound` | `RadioSounds`: pack sound or vanilla fallback, per listener |
+| `effects` | `PostFx`: per-player post effects |
+| `pack` | `PackBuilder`, `PackService`, `SamePortHttp`, `PackHttpServer`, `TextShaderMerge` |
+| `integration` | `LuckPermsHook`, `VoiceChatModule` (experimental); only loaded when those plugins are installed |
+| `commands` | `RadioCommand` (Brigadier, `LifecycleEvents.COMMANDS`) |
 
 ## Limits worth knowing
 
-- Post effects are drawn before the GUI. `radio:gui` changes the world behind the menu, never the menu.
-- A chest title cannot be changed in place, so the menu is reopened when the channel, power or ON AIR lamp changes.
 - Radio chat cancels the chat event and sends the text as a transmission on the next tick (hearing a channel depends
   on inventories, which must be read on the main thread). Chat plugins that listen at MONITOR will not see it.
-- Sodium/Iris: fonts, item models and sounds are unaffected. Iris replaces the post-processing pipeline while a
-  shader pack is active, so the post effects may not show then. Not tested.
+- The popup takes one boss bar slot at the top of the screen (it is empty there); other boss bars move down a row.
+- Sodium/Iris: fonts, item models and sounds are unaffected. Iris replaces core shaders and the post pipeline while
+  a shader pack is active, so the popup may stay at the top centre and the burst may not show. Not tested.
 - `SamePortHttp` reaches the server's listening channel by reflection (the only non-API code).
 
 ## What is verified
 
-On Paper 26.3 with a real 26.3 client: the plugin loads without errors; the pack is delivered on the Minecraft port
-and loads; the transceiver GUI, icons, channel tints, display text and ON AIR lamp render as in the screenshot; the
-`radio:gui` post effect applies; `/radio say`, `give`, `channel ...`, `reload` work from the console. The text shader
-effects (waveform, lamp pulse, scanlines, on-air static) run with Radio alone and with SuperbVehicles 0.7.0 and CCTV
-0.7.0 installed on the same server. The merged shader passes glslang in all three combinations (vanilla, CCTV,
-SuperbVehicles + CCTV) and every variant.
+On Paper 26.3 (build 253) with a real 26.3 client: the plugin loads without errors; the pack is delivered on the
+Minecraft port; the popup renders in the corner as in the screenshot, with messages, wrapping, the lamp and static
+during a transmission; it disappears when the radio is switched off; the same with SuperbVehicles 0.7.0 and CCTV
+0.7.0 installed. The merged shader passes glslang in every variant, with and without those two plugins.
 
 Not verified (needs a person at a client, or the other plugin):
 
-- [ ] clicking every GUI button; scrolling with more than 32 channels
-- [ ] the dialog: open from the GUI and `/radio talk`, channel selector, Send
-- [ ] radio chat with a second player; public chat stays normal without a powered radio
-- [ ] sounds: in, out, power, switch; vanilla fallbacks after declining the pack; the plain GUI after declining
-- [ ] sneak + right-click power toggle; the recipe (`item.recipe.enabled`)
-- [ ] the title follows `/radio power` while the GUI is open (fixed after the last client run)
-- [ ] LuckPerms: context, live refresh, prefix/suffix
-- [ ] Simple Voice Chat module (`voice.enabled`), never run against a voice server
-- [ ] rate limit and max length messages; `/radio reload` with a broken config
-- [ ] SuperbVehicles' vehicle HUD and CCTV's camera HUD and monitors while Radio's merged shader is the one running
-      (their blocks are carried over unchanged and compile, but nobody has looked at them on a client)
-- [ ] Lighting and Firearms packs on the same server
+- [ ] the new sounds, by ear: transmission start, the "over" beep and squelch tail, power on/off, channel click
+- [ ] right-click on/off and sneak + right-click channel change (driven by commands in the tests, not by clicks)
+- [ ] typing in chat with a second player; `!text` reaching public chat; chat staying normal with the radio off
+- [ ] the plain one-line bar and chat messages for a player who declined the pack
+- [ ] the burst post effect in the corner; `popup.side: left`, `popup.scale` other than 1
+- [ ] SuperbVehicles' vehicle HUD and CCTV's camera HUD and monitors while Radio's merged shader is running
+- [ ] LuckPerms: context, live refresh, prefix/suffix; Simple Voice Chat module
+- [ ] Lighting, Firearms and Vitals on the same server (Vitals also uses boss bars)
 
-Version-sensitive: built against `paper-api 26.3.build.253-stable` and tested on server build 246; the Dialog API and
-`Player.postEffects()` are recent Paper API; `pack_format` 97 is 26.3 only.
+Version-sensitive: built against `paper-api 26.3.build.253-stable`; `Player.postEffects()` is recent Paper API;
+`pack_format` 97 is 26.3 only.

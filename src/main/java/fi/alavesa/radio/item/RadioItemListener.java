@@ -1,8 +1,10 @@
 package fi.alavesa.radio.item;
 
 import fi.alavesa.radio.RadioPlugin;
+import fi.alavesa.radio.channels.Channel;
 import fi.alavesa.radio.permissions.Perms;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Bukkit;
@@ -18,10 +20,11 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ShapedRecipe;
 
 /**
- * Using the radio item: right-click opens the GUI, sneak + right-click toggles the power. Also owns the optional
+ * Using the radio item: right-click switches it on or off, sneak + right-click tunes to the next channel. Also owns the optional
  * crafting recipe (config item.recipe).
  */
 public final class RadioItemListener implements Listener {
@@ -52,13 +55,22 @@ public final class RadioItemListener implements Listener {
         }
         RadioItem.State state = plugin.item().read(e.getItem());
         if (state == null) return;
-        if (p.isSneaking()) {
-            plugin.togglePower(p, new RadioLocator.Found(
-                    e.getHand() == org.bukkit.inventory.EquipmentSlot.OFF_HAND ? 40 : p.getInventory().getHeldItemSlot(),
-                    e.getItem(), state), null);
-        } else {
-            plugin.menus().open(p, state, 0);
+        RadioLocator.Found radio = new RadioLocator.Found(
+                e.getHand() == EquipmentSlot.OFF_HAND ? 40 : p.getInventory().getHeldItemSlot(), e.getItem(), state);
+        if (!p.isSneaking()) {
+            plugin.togglePower(p, radio, null);
+            return;
         }
+        // sneak + right-click: the next channel the player may use, wrapping around
+        List<Channel> list = Perms.visible(p, plugin.channels());
+        if (list.isEmpty()) {
+            plugin.messages().send(p, "error.no-channel");
+            return;
+        }
+        int at = -1;
+        for (int i = 0; i < list.size(); i++) if (list.get(i).id().equals(state.channel())) at = i;
+        Channel next = list.get((at + 1) % list.size());
+        if (!next.id().equals(state.channel())) plugin.tune(p, radio, next);
     }
 
     @EventHandler(ignoreCancelled = true)

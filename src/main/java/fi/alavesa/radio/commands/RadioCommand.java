@@ -11,7 +11,6 @@ import fi.alavesa.radio.RadioPlugin;
 import fi.alavesa.radio.channels.Channel;
 import fi.alavesa.radio.channels.ChannelRegistry;
 import fi.alavesa.radio.config.Messages;
-import fi.alavesa.radio.config.RadioConfig;
 import fi.alavesa.radio.item.RadioLocator;
 import fi.alavesa.radio.permissions.Perms;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -34,11 +33,11 @@ import org.jspecify.annotations.Nullable;
  * /radio, registered with Brigadier through Paper's lifecycle API:
  *
  * <pre>
- * /radio                                   open the GUI
- * /radio talk                              open the message dialog
+ * /radio                                   switch your radio on or off (the popup follows)
+ * /radio power [on|off]
+ * /radio tune &lt;channel&gt;                    tune to a channel you may use
+ * /radio volume &lt;0-100&gt;
  * /radio say &lt;message&gt;                     transmit once
- * /radio chat                              toggle radio chat (input mode chat/dialog)
- * /radio power [on|off]                    switch the radio
  * /radio give &lt;players&gt; [amount]           radio.give
  * /radio channel list                      radio.admin
  * /radio channel create &lt;id&gt; [name]        radio.admin
@@ -62,6 +61,13 @@ public final class RadioCommand {
         SuggestionProvider<CommandSourceStack> channelIds = (ctx, b) -> {
             String typed = b.getRemainingLowerCase();
             for (String id : plugin.channels().ids()) if (id.startsWith(typed)) b.suggest(id);
+            return b.buildFuture();
+        };
+        SuggestionProvider<CommandSourceStack> usable = (ctx, b) -> {
+            String typed = b.getRemainingLowerCase();
+            if (ctx.getSource().getExecutor() instanceof Player p) {
+                for (Channel c : Perms.visible(p, plugin.channels())) if (c.id().startsWith(typed)) b.suggest(c.id());
+            }
             return b.buildFuture();
         };
         SuggestionProvider<CommandSourceStack> colors = (ctx, b) -> {
@@ -88,12 +94,16 @@ public final class RadioCommand {
         return Commands.literal("radio")
                 .requires(src -> src.getSender().hasPermission(Perms.USE) || src.getSender().hasPermission(Perms.GIVE)
                         || src.getSender().hasPermission(Perms.RELOAD) || src.getSender().hasPermission(Perms.ADMIN))
-                .executes(ctx -> player(ctx, p -> plugin.menus().open(p)))
-                .then(Commands.literal("talk").requires(has(Perms.USE)).executes(ctx -> player(ctx, p -> plugin.dialog().open(p))))
+                .executes(ctx -> player(ctx, p -> power(p, null)))
+                .then(Commands.literal("tune").requires(has(Perms.USE))
+                        .then(Commands.argument("channel", StringArgumentType.word()).suggests(usable)
+                                .executes(ctx -> player(ctx, p -> tune(p, StringArgumentType.getString(ctx, "channel"))))))
+                .then(Commands.literal("volume").requires(has(Perms.USE))
+                        .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
+                                .executes(ctx -> player(ctx, p -> volume(p, IntegerArgumentType.getInteger(ctx, "percent"))))))
                 .then(Commands.literal("say").requires(has(Perms.USE))
                         .then(Commands.argument("message", StringArgumentType.greedyString()).executes(ctx ->
                                 player(ctx, p -> plugin.transmitter().transmit(p, null, StringArgumentType.getString(ctx, "message"))))))
-                .then(Commands.literal("chat").requires(has(Perms.USE)).executes(ctx -> player(ctx, this::toggleChat)))
                 .then(Commands.literal("power").requires(has(Perms.USE))
                         .executes(ctx -> player(ctx, p -> power(p, null)))
                         .then(Commands.literal("on").executes(ctx -> player(ctx, p -> power(p, true))))
@@ -127,21 +137,40 @@ public final class RadioCommand {
         return 0;
     }
 
-    private void toggleChat(Player p) {
-        boolean chat = plugin.players().mode(p, plugin.config()) == RadioConfig.Mode.CHAT;
-        plugin.players().mode(p, chat ? RadioConfig.Mode.DIALOG : RadioConfig.Mode.CHAT);
-        plugin.messages().send(p, chat ? "mode.chat-off" : "mode.chat-on");
-        plugin.menus().refresh(p);
-    }
-
-    private void power(Player p, @Nullable Boolean on) {
+    /** The player's active radio, or null after telling them they have none. */
+    private RadioLocator.@Nullable Found radio(Player p) {
         RadioLocator.Found radio = plugin.locator().active(p);
         if (radio == null) {
             plugin.messages().send(p, "error.no-radio", Placeholder.component("rule",
                     plugin.messages().get("rule." + plugin.config().carry.name().toLowerCase(Locale.ROOT))));
+        }
+        return radio;
+    }
+
+    private void tune(Player p, String id) {
+        RadioLocator.Found radio = radio(p);
+        if (radio == null) return;
+        Channel c = plugin.channels().get(id.toLowerCase(Locale.ROOT));
+        if (c == null || (!Perms.canListen(p, c) && !Perms.canSpeak(p, c))) {
+            // the same answer for "does not exist" and "not yours": channel ids are not leaked
+            plugin.messages().send(p, "error.unknown-channel", Placeholder.unparsed("id", id));
             return;
         }
-        plugin.togglePower(p, radio, on);
+        plugin.tune(p, radio, c);
+    }
+
+    private void volume(Player p, int percent) {
+        RadioLocator.Found radio = radio(p);
+        if (radio == null) return;
+        var state = plugin.locator().update(p, radio, radio.state().withVolume(percent)).state();
+        plugin.sounds().play(p, "switch", plugin.channels().get(state.channel()), state.volume());
+        plugin.messages().send(p, "power.volume", Placeholder.unparsed("volume", String.valueOf(state.volume())));
+        plugin.hud().update(p);
+    }
+
+    private void power(Player p, @Nullable Boolean on) {
+        RadioLocator.Found radio = radio(p);
+        if (radio != null) plugin.togglePower(p, radio, on);
     }
 
     private void pack(Player p) {
