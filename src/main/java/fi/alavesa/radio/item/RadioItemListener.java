@@ -31,7 +31,8 @@ public final class RadioItemListener implements Listener {
 
     private final RadioPlugin plugin;
     private final NamespacedKey recipeKey;
-    /** One right-click can fire several interact events (both hands, air and block): act once per tick. */
+    /** One right-click can fire several interact events (both hands, air and block): act once per click. */
+    private static final int CLICK_GAP_TICKS = 4;
     private final Map<UUID, Integer> lastUse = new HashMap<>();
 
     public RadioItemListener(RadioPlugin plugin) {
@@ -47,8 +48,10 @@ public final class RadioItemListener implements Listener {
         e.setUseItemInHand(Event.Result.DENY);
         e.setUseInteractedBlock(Event.Result.DENY);
         Player p = e.getPlayer();
-        Integer last = lastUse.put(p.getUniqueId(), Bukkit.getCurrentTick());
-        if (last != null && last == Bukkit.getCurrentTick()) return;
+        // one click can arrive as two packets (use-on-block, then use-in-air) a tick apart
+        Integer last = lastUse.get(p.getUniqueId());
+        if (last != null && Bukkit.getCurrentTick() - last < CLICK_GAP_TICKS) return;
+        lastUse.put(p.getUniqueId(), Bukkit.getCurrentTick());
         if (!p.hasPermission(Perms.USE)) {
             plugin.messages().send(p, "error.no-permission");
             return;

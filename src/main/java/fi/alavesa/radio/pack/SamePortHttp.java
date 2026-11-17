@@ -79,10 +79,13 @@ public final class SamePortHttp {
     @ChannelHandler.Sharable
     private final class Acceptor extends ChannelInboundHandlerAdapter {
         @Override public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            ctx.fireChannelRead(msg);
+            // AFTER everything behind us has set the new connection up: our sniffer then sits in front of the other
+            // plugins' sniffers. Some of them (Firearms 0.33) answer 404 to every download that is not their own
+            // instead of passing it on, which would otherwise swallow the Radio pack request.
             if (msg instanceof Channel child) {
                 try { if (child.pipeline().get(CHILD) == null) child.pipeline().addFirst(CHILD, new Sniffer()); } catch (Throwable ignored) { }
             }
-            ctx.fireChannelRead(msg);
         }
     }
 

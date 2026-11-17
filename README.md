@@ -23,7 +23,7 @@ Players without the resource pack get a one-line boss bar instead of the popup a
 ## Build and install
 
 ```
-./gradlew build          # needs a JDK 25 or newer; the jar is build/libs/radio-0.2.0.jar
+./gradlew build          # needs a JDK 25 or newer; the jar is build/libs/radio-0.2.1.jar
 ```
 
 Put the jar in `plugins/` and restart. Delete any older Radio jar first: Paper loads the first jar with the same
@@ -109,6 +109,22 @@ python3 tools/validate_shaders.py <glslang> <unzipped radio-pack>/assets,<26.3 c
 
 Run it without defines and with `-DIS_SEE_THROUGH` and `-DIS_GRAYSCALE` too.
 
+## The popup does not show
+
+Run `/radio pack` as the player. It prints what the client reported for the Radio pack.
+
+- **failed download**: the client could not fetch the pack, so the player gets the one-line bar. The console has a
+  warning with the URL. Firearms 0.33.0 and older answer 404 to every pack download on the Minecraft port that is not
+  their own; Radio 0.2.1 puts its own handler in front so its pack still arrives, but SuperbVehicles, CCTV and
+  Lighting packs are still blocked by it until Firearms is updated.
+- **declined** or **no answer yet**: the player has server resource packs off, or has not answered the prompt.
+  Enabling a copy of the zip by hand in the resource pack menu does not count: the plugin only knows about the pack
+  it sent.
+- **successfully loaded** but only a line of text at the top of the screen: the console said "text shader not
+  shipped" at startup (see below), or `popup.enabled` is false.
+- **successfully loaded** and odd coloured text at the top centre: another pack's text shader is on top of Radio's.
+  Rejoining pushes Radio's pack last again.
+
 ## Resource pack
 
 Pack format 97 (Minecraft 26.3 only). `pack.delivery`:
@@ -161,7 +177,7 @@ Sounds are Ogg Vorbis in `sounds/radio/`.
 On Paper 26.3 (build 253) with a real 26.3 client: the plugin loads without errors; the pack is delivered on the
 Minecraft port; the popup renders in the corner as in the screenshot, with messages, wrapping, the lamp and static
 during a transmission; it disappears when the radio is switched off; the same with SuperbVehicles 0.7.0 and CCTV
-0.7.0 installed. The merged shader passes glslang in every variant, with and without those two plugins.
+0.7.0 installed, and with Firearms 0.33.0, Lighting 0.4.0, Vitals and Labra added. The merged shader passes glslang in every variant, with and without those two plugins.
 
 Not verified (needs a person at a client, or the other plugin):
 

@@ -226,7 +226,15 @@ public final class PackService implements Listener {
     public void onStatus(PlayerResourcePackStatusEvent e) {
         Player p = e.getPlayer();
         if (e.getID().equals(PACK_ID)) {
+            // DISCARDED is about the copy an earlier push left behind (we push again to stay on top); it says
+            // nothing about the copy the client is using now
+            if (e.getStatus() == PlayerResourcePackStatusEvent.Status.DISCARDED) return;
             status.put(p.getUniqueId(), e.getStatus());
+            if (e.getStatus() == PlayerResourcePackStatusEvent.Status.FAILED_DOWNLOAD) {
+                log.warning(p.getName() + " could not download the Radio pack from " + uri(p) + ". They get the one-line bar "
+                        + "instead of the popup. If the URL answers 404, another plugin is answering downloads on the "
+                        + "Minecraft port; behind a proxy set pack.delivery: http or url.");
+            }
             onStatus.accept(p, e.getStatus());
             return;
         }
