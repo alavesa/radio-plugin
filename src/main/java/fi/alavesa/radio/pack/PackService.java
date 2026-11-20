@@ -53,6 +53,8 @@ public final class PackService implements Listener {
      * it belongs above the Radio pack: sending ours again after it would only start a tug of war over the top place.
      */
     private static final UUID IDCARDS_PACK_ID = UUID.nameUUIDFromBytes("idcards:pack".getBytes(StandardCharsets.UTF_8));
+    /** The SCP079 pack: like IdCards', its text shader is built on top of ours (or of IdCards'), so it belongs above. */
+    private static final UUID SCP079_PACK_ID = UUID.nameUUIDFromBytes("scp079:pack".getBytes(StandardCharsets.UTF_8));
 
     /** How often our pack is sent again to stay above a pack that loaded after it, per player and session. */
     private static final int MAX_REPUSHES = 3;
@@ -247,7 +249,8 @@ public final class PackService implements Listener {
         // Another pack was pushed after ours (ACCEPTED is the client's first answer to a push) and has now loaded: it
         // sits above ours, and if it carries its own, un-merged text shader, ours no longer runs. Send ours again.
         // Capped, so two plugins doing the same can never ping-pong forever.
-        if (!cfg.packTextShader || !sentAt.containsKey(p.getUniqueId()) || e.getID().equals(IDCARDS_PACK_ID)) return;
+        if (!cfg.packTextShader || !sentAt.containsKey(p.getUniqueId()) || e.getID().equals(IDCARDS_PACK_ID)
+                || e.getID().equals(SCP079_PACK_ID)) return;
         Set<UUID> newer = pushedAfterOurs.computeIfAbsent(p.getUniqueId(), k -> new HashSet<>());
         if (e.getStatus() == PlayerResourcePackStatusEvent.Status.ACCEPTED) {
             newer.add(e.getID());
