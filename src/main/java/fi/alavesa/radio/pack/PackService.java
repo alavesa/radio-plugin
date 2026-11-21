@@ -59,7 +59,9 @@ public final class PackService implements Listener {
     private static final UUID INTERCOM_PACK_ID = UUID.nameUUIDFromBytes("intercom:pack".getBytes(StandardCharsets.UTF_8));
 
     /** How often our pack is sent again to stay above a pack that loaded after it, per player and session. */
-    private static final int MAX_REPUSHES = 3;
+    private static final int MAX_REPUSHES = 5;
+    /** How long no other pack may finish loading before ours is sent again. */
+    private static final long SETTLE_TICKS = 60L;
 
     private final Plugin plugin;
     private final Logger log;
@@ -79,6 +81,8 @@ public final class PackService implements Listener {
     private final Map<UUID, Integer> sentAt = new HashMap<>(), repushes = new HashMap<>();
     /** Other packs the server pushed to a player after our last send (their ids), per player. */
     private final Map<UUID, Set<UUID>> pushedAfterOurs = new HashMap<>();
+    /** The re-send waiting for the other packs to settle, per player. */
+    private final Map<UUID, org.bukkit.scheduler.BukkitTask> pending = new HashMap<>();
 
     private final java.util.function.BiConsumer<Player, PlayerResourcePackStatusEvent.Status> onStatus;
 
@@ -225,7 +229,44 @@ public final class PackService implements Listener {
         forget(e.getPlayer());
     }
 
+    /**
+     * True when a pack may stay above ours: it is one of the plugins whose text shader is built on top of Radio's, AND
+     * its zip on disk really contains Radio's hooks right now. Yielding on the id alone broke the popup whenever such a
+     * pack had been built before Radio's zip existed or from an old one: the client then ran a text shader without
+     * the radio code and drew the popup as raw yellow text at the top of the screen. IdCards 1.1 ships no text
+     * shader at all, so its pack can sit anywhere and is simply ignored.
+     */
+    private boolean carriesOurHooks(UUID id) {
+        if (id.equals(IDCARDS_PACK_ID)) return true;
+        String zip = id.equals(SCP079_PACK_ID) ? "SCP079/SCP079-pack.zip" : id.equals(INTERCOM_PACK_ID) ? "Intercom/Intercom-pack.zip" : null;
+        if (zip == null) return false;
+        File f = otherPack(zip);
+        if (!f.isFile()) return false;
+        try (java.util.zip.ZipFile z = new java.util.zip.ZipFile(f)) {
+            for (java.util.zip.ZipEntry entry : java.util.Collections.list(z.entries())) {
+                if (!entry.getName().endsWith("shaders/core/text.vsh")) continue;
+                try (InputStream in = z.getInputStream(entry)) {
+                    if (new String(in.readAllBytes(), StandardCharsets.UTF_8).contains("radio_text_vertex")) return true;
+                }
+            }
+        } catch (IOException ex) {
+            log.fine("could not read " + f + ": " + ex);
+        }
+        log.info("the " + zip.substring(0, zip.indexOf('/')) + " pack has no radio hooks in its text shader: Radio stays on top for " + "this player");
+        return false;
+    }
+
+    /** True while a pack that was accepted after our last send has not reported the end of its download yet. */
+    private boolean newerStillLoading(Player p) {
+        Set<UUID> newer = pushedAfterOurs.get(p.getUniqueId());
+        if (newer == null || newer.isEmpty()) return false;
+        // they will report SUCCESSFULLY_LOADED (or a failure) and schedule the next attempt themselves
+        return true;
+    }
+
     private void forget(Player p) {
+        org.bukkit.scheduler.BukkitTask waiting = pending.remove(p.getUniqueId());
+        if (waiting != null) waiting.cancel();
         status.remove(p.getUniqueId());
         sentAt.remove(p.getUniqueId());
         repushes.remove(p.getUniqueId());
@@ -251,14 +292,24 @@ public final class PackService implements Listener {
         // Another pack was pushed after ours (ACCEPTED is the client's first answer to a push) and has now loaded: it
         // sits above ours, and if it carries its own, un-merged text shader, ours no longer runs. Send ours again.
         // Capped, so two plugins doing the same can never ping-pong forever.
-        if (!cfg.packTextShader || !sentAt.containsKey(p.getUniqueId()) || e.getID().equals(IDCARDS_PACK_ID)
-                || e.getID().equals(SCP079_PACK_ID) || e.getID().equals(INTERCOM_PACK_ID)) return;
+        if (!cfg.packTextShader || !sentAt.containsKey(p.getUniqueId()) || carriesOurHooks(e.getID())) return;
         Set<UUID> newer = pushedAfterOurs.computeIfAbsent(p.getUniqueId(), k -> new HashSet<>());
-        if (e.getStatus() == PlayerResourcePackStatusEvent.Status.ACCEPTED) {
+        if (e.getStatus() == PlayerResourcePackStatusEvent.Status.FAILED_DOWNLOAD || e.getStatus() == PlayerResourcePackStatusEvent.Status.FAILED_RELOAD
+                || e.getStatus() == PlayerResourcePackStatusEvent.Status.DECLINED || e.getStatus() == PlayerResourcePackStatusEvent.Status.DISCARDED
+                || e.getStatus() == PlayerResourcePackStatusEvent.Status.INVALID_URL) {
+            newer.remove(e.getID()); // it will never finish loading: stop waiting for it
+        } else if (e.getStatus() == PlayerResourcePackStatusEvent.Status.ACCEPTED) {
             newer.add(e.getID());
-        } else if (e.getStatus() == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED && newer.remove(e.getID())
-                && repushes.merge(p.getUniqueId(), 1, Integer::sum) <= MAX_REPUSHES) {
-            Bukkit.getScheduler().runTaskLater(plugin, () -> send(p), 20L);
+        } else if (e.getStatus() == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED && newer.remove(e.getID())) {
+            // Wait until the packs have stopped arriving, then send once. Sending after every single pack used the
+            // few allowed re-sends up while a slow connection was still downloading the big ones, and whichever
+            // pack arrived last then stayed on top with a text shader that lacks the radio's hooks.
+            org.bukkit.scheduler.BukkitTask waiting = pending.remove(p.getUniqueId());
+            if (waiting != null) waiting.cancel();
+            pending.put(p.getUniqueId(), Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                pending.remove(p.getUniqueId());
+                if (!newerStillLoading(p) && repushes.merge(p.getUniqueId(), 1, Integer::sum) <= MAX_REPUSHES) send(p);
+            }, SETTLE_TICKS));
         }
     }
 
