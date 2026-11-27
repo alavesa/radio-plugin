@@ -100,7 +100,7 @@ public final class ChannelRegistry {
             }
         }
         return new Channel(id, s.getString("name", id), color, s.getString("frequency", ""), icon, s.getString("glyph", ""),
-                Map.copyOf(sounds), Collections.unmodifiableMap(raw));
+                Map.copyOf(sounds), Collections.unmodifiableMap(raw), s.getString("tab", "").strip());
     }
 
     /** #RRGGBB or a named colour; null when neither. */
@@ -153,6 +153,7 @@ public final class ChannelRegistry {
             if (!c.frequency().isEmpty()) yml.set(p + "frequency", c.frequency());
             yml.set(p + "icon", c.icon().name());
             if (!c.glyph().isEmpty()) yml.set(p + "glyph", c.glyph());
+            if (!c.tab().isEmpty()) yml.set(p + "tab", c.tab());
             for (var e : c.rawSounds().entrySet()) yml.createSection(p + "sounds." + e.getKey(), e.getValue());
         }
         return HEADER + yml.saveToString();

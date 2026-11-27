@@ -28,21 +28,24 @@
   {
    "type": "bitmap",
    "file": "radio:font/hud.png",
-   "height": 8,
-   "ascent": 7,
+   "height": 13,
+   "ascent": 10,
    "chars": [
     " !\"#$%&'()*+,-./",
     "0123456789:;<=>?",
     "@ABCDEFGHIJKLMNO",
     "PQRSTUVWXYZ[\\]^_",
-    "ÄÖÅÜÉ"
+    "`abcdefghijklmno",
+    "pqrstuvwxyz{|}~ä",
+    "öåÄÖÅüÜéÉèñß°·•€",
+    "£¡¿"
    ]
   },
   {
    "type": "bitmap",
    "file": "radio:font/panel.png",
-   "height": 104,
-   "ascent": 7,
+   "height": 138,
+   "ascent": 10,
    "chars": [
     ""
    ]
@@ -50,10 +53,19 @@
   {
    "type": "bitmap",
    "file": "radio:font/lamp.png",
-   "height": 104,
-   "ascent": 7,
+   "height": 138,
+   "ascent": 10,
    "chars": [
     ""
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "radio:font/pill.png",
+   "height": 17,
+   "ascent": 10,
+   "chars": [
+    ""
    ]
   }
  ]

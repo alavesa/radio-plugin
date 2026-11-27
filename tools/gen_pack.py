@@ -1,40 +1,41 @@
 #!/usr/bin/env python3
-"""Generates the art, font, item model and sounds of the Radio resource pack into resourcepack/.
+"""Generates the art, font definitions, item model and sounds of the Radio resource pack into resourcepack/.
 
-    python3 tools/gen_pack.py            # everything (sounds need ffmpeg on PATH)
+    java tools/GenFont.java tools/fonts resourcepack/assets/radio/textures/font tools/hud_chars.json   # the fonts (once)
+    python3 tools/gen_pack.py            # panel art, font definitions, layout, item model, sounds (need ffmpeg)
     python3 tools/gen_pack.py --no-sounds
 
 Pure standard library: PNGs are written by hand, sounds are synthesised as WAV and encoded with ffmpeg.
-Everything this script writes is placeholder art that can be replaced file by file (same name, same size); see
-README "Replacing the art". The hand-written parts of the pack (pack.mcmeta, post effects, shaders) are not touched.
+The hand-written parts of the pack (pack.mcmeta, post effects, shaders) are not touched.
 
 THE POPUP (fi.alavesa.radio.hud, shaders/include/radio_text_*.glsl). The radio popup is the name of a boss bar,
-written in the font radio:hud and moved to the screen corner by the text shader:
-- the font is monospace by construction: every cell of hud.png is CELL_W wide and has an alpha-1 pixel in its last
-  column where the glyph leaves it empty (the client measures a bitmap glyph up to its last non-transparent column),
-  so every character advances CELL_W + 1 px and the plugin can lay text out without knowing glyph shapes;
+written in the fonts radio:hud / radio:bold and moved to the screen corner by the text shader:
+- the fonts are bitmap sheets of B612 Mono (SIL OFL, see assets/radio/licenses), rasterised by tools/GenFont.java:
+  monospace by construction, every character advances CELL_W + 1 px, so the plugin lays text out without metrics;
 - signed "space" characters of +-2^n px move the pen anywhere, and every popup ends with the pen back at 0, so its
   total width is 0 and the client's centring puts pen 0 exactly at the screen centre;
-- the text colour #FEFBxx marks popup glyphs: xx bits 0-3 = line (15 = art), bits 4-6 = palette / art flags. The
-  vertex shader moves marked glyphs from the screen centre to the corner and to their line's row.
-Geometry here (PANEL_*, LINE_Y, LAMP) is written to shaders/include/radio_layout.glsl and mirrored in HudText.java.
+- the text colour #FEFBxx marks popup glyphs: xx bits 0-3 = line (15 = panel/lamp art, 14 = the tab pill), bits 4-6 =
+  palette / art flags. The vertex shader moves marked glyphs from the screen centre to the corner and to their row.
+Geometry here is written to shaders/include/radio_layout.glsl and mirrored in HudText.java.
 """
 import json, math, os, random, struct, subprocess, sys, wave, zlib
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'resourcepack')
 NS = os.path.join(ROOT, 'assets', 'radio')
+TOOLS = os.path.dirname(os.path.abspath(__file__))
 
 # ---- popup geometry, GUI pixels ------------------------------------------------------------------------------------------
-CELL_W, CELL_H = 5, 8                # glyph cell; advance = CELL_W + 1
-PANEL_W, PANEL_H = 176, 104
-TEXT_X = 4                           # left edge of the text columns; 28 columns fit
-LINE_Y = [4, 15, 28, 38, 48, 58, 68, 82, 92]    # top of each text line: header, id, 5 message lines, 2 hint lines
-SEPARATORS = [25, 79]
-LAMP = (150, 3, 22, 9)               # x, y, width, height of the TX/RX lamp in the panel
+CELL_W, CELL_H = 7, 13               # glyph cell (tools/GenFont.java); advance = CELL_W + 1
+PANEL_W, PANEL_H = 208, 138
+TEXT_X = 8                           # left edge of the 24 text columns
+# text rows: 0 header, 1 tabs, 2..6 messages (5), 7 footer
+LINE_Y = [6, 24, 46, 60, 74, 88, 102, 120]
+SEPARATORS = [42, 116]
+PILL = (46, 17, 20)                  # tab pill: width, height, y
+LAMP = (178, 6, 22, 11)              # x, y, width, height of the TX/RX lamp in the header
 
 SPACE_POS, SPACE_NEG, SPACE_BITS = 0xF000, 0xF100, 10
-CHAR_PANEL, CHAR_LAMP = 0xE010, 0xE011
-GFX_DOT, GFX_ARROW, GFX_BLOCK = 0xE100, 0xE101, 0xE102
+CHAR_PANEL, CHAR_LAMP, CHAR_PILL = 0xE010, 0xE011, 0xE012
 
 
 # ---- tiny PNG canvas -------------------------------------------------------------------------------------------------
@@ -53,17 +54,6 @@ class Canvas:
             for x in range(x0, x1 + 1):
                 self.set(x, y, c)
 
-    def frame(self, x0, y0, x1, y1, c):
-        for x in range(x0, x1 + 1):
-            self.set(x, y0, c); self.set(x, y1, c)
-        for y in range(y0, y1 + 1):
-            self.set(x0, y, c); self.set(x1, y, c)
-
-    def glyph(self, x, y, rows, c):
-        for dy, row in enumerate(rows):
-            for dx, bit in enumerate(row):
-                if bit == '#': self.set(x + dx, y + dy, c)
-
     def save(self, path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         raw = b''.join(b'\x00' + bytes(v for p in row for v in p) for row in self.px)
@@ -74,122 +64,62 @@ class Canvas:
                     + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b''))
 
 
-# ---- the popup font: 5x7 capitals (the glyph shapes of CCTV's OSD font, plus a few more) -----------------------------------
-G = {}
-def g(ch, *rows):
-    G[ch] = rows
-g(' ', *['.....'] * 7)
-g('0', '.###.', '#...#', '#..##', '#.#.#', '##..#', '#...#', '.###.')
-g('1', '..#..', '.##..', '..#..', '..#..', '..#..', '..#..', '.###.')
-g('2', '.###.', '#...#', '....#', '...#.', '..#..', '.#...', '#####')
-g('3', '#####', '...#.', '..#..', '...#.', '....#', '#...#', '.###.')
-g('4', '...#.', '..##.', '.#.#.', '#..#.', '#####', '...#.', '...#.')
-g('5', '#####', '#....', '####.', '....#', '....#', '#...#', '.###.')
-g('6', '..##.', '.#...', '#....', '####.', '#...#', '#...#', '.###.')
-g('7', '#####', '....#', '...#.', '..#..', '.#...', '.#...', '.#...')
-g('8', '.###.', '#...#', '#...#', '.###.', '#...#', '#...#', '.###.')
-g('9', '.###.', '#...#', '#...#', '.####', '....#', '...#.', '.##..')
-g('A', '.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#')
-g('B', '####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.')
-g('C', '.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.')
-g('D', '###..', '#..#.', '#...#', '#...#', '#...#', '#..#.', '###..')
-g('E', '#####', '#....', '#....', '####.', '#....', '#....', '#####')
-g('F', '#####', '#....', '#....', '####.', '#....', '#....', '#....')
-g('G', '.###.', '#...#', '#....', '#.###', '#...#', '#...#', '.####')
-g('H', '#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#')
-g('I', '.###.', '..#..', '..#..', '..#..', '..#..', '..#..', '.###.')
-g('J', '..###', '...#.', '...#.', '...#.', '...#.', '#..#.', '.##..')
-g('K', '#...#', '#..#.', '#.#..', '##...', '#.#..', '#..#.', '#...#')
-g('L', '#....', '#....', '#....', '#....', '#....', '#....', '#####')
-g('M', '#...#', '##.##', '#.#.#', '#.#.#', '#...#', '#...#', '#...#')
-g('N', '#...#', '#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#')
-g('O', '.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.')
-g('P', '####.', '#...#', '#...#', '####.', '#....', '#....', '#....')
-g('Q', '.###.', '#...#', '#...#', '#...#', '#.#.#', '#..#.', '.##.#')
-g('R', '####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#')
-g('S', '.####', '#....', '#....', '.###.', '....#', '....#', '####.')
-g('T', '#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..')
-g('U', '#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.')
-g('V', '#...#', '#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..')
-g('W', '#...#', '#...#', '#...#', '#.#.#', '#.#.#', '#.#.#', '.#.#.')
-g('X', '#...#', '#...#', '.#.#.', '..#..', '.#.#.', '#...#', '#...#')
-g('Y', '#...#', '#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..')
-g('Z', '#####', '....#', '...#.', '..#..', '.#...', '#....', '#####')
-g('!', '..#..', '..#..', '..#..', '..#..', '..#..', '.....', '..#..')
-g('"', '.#.#.', '.#.#.', '.....', '.....', '.....', '.....', '.....')
-g('#', '.#.#.', '.#.#.', '#####', '.#.#.', '#####', '.#.#.', '.#.#.')
-g('$', '..#..', '.####', '#.#..', '.###.', '..#.#', '####.', '..#..')
-g('%', '##...', '##..#', '...#.', '..#..', '.#...', '#..##', '...##')
-g('&', '.##..', '#..#.', '#.#..', '.#...', '#.#.#', '#..#.', '.##.#')
-g("'", '..#..', '..#..', '.#...', '.....', '.....', '.....', '.....')
-g('(', '...#.', '..#..', '.#...', '.#...', '.#...', '..#..', '...#.')
-g(')', '.#...', '..#..', '...#.', '...#.', '...#.', '..#..', '.#...')
-g('*', '.....', '..#..', '#.#.#', '.###.', '#.#.#', '..#..', '.....')
-g('+', '.....', '..#..', '..#..', '#####', '..#..', '..#..', '.....')
-g(',', '.....', '.....', '.....', '.....', '.##..', '..#..', '.#...')
-g('-', '.....', '.....', '.....', '.###.', '.....', '.....', '.....')
-g('.', '.....', '.....', '.....', '.....', '.....', '.##..', '.##..')
-g('/', '....#', '....#', '...#.', '..#..', '.#...', '#....', '#....')
-g(':', '.....', '.##..', '.##..', '.....', '.##..', '.##..', '.....')
-g(';', '.....', '.##..', '.##..', '.....', '.##..', '..#..', '.#...')
-g('<', '...#.', '..#..', '.#...', '#....', '.#...', '..#..', '...#.')
-g('=', '.....', '.....', '#####', '.....', '#####', '.....', '.....')
-g('>', '.#...', '..#..', '...#.', '....#', '...#.', '..#..', '.#...')
-g('?', '.###.', '#...#', '....#', '...#.', '..#..', '.....', '..#..')
-g('@', '.###.', '#...#', '#.###', '#.#.#', '#.###', '#....', '.###.')
-g('[', '.###.', '.#...', '.#...', '.#...', '.#...', '.#...', '.###.')
-g('\\', '#....', '#....', '.#...', '..#..', '...#.', '....#', '....#')
-g(']', '.###.', '...#.', '...#.', '...#.', '...#.', '...#.', '.###.')
-g('^', '..#..', '.#.#.', '#...#', '.....', '.....', '.....', '.....')
-g('_', '.....', '.....', '.....', '.....', '.....', '.....', '#####')
-g('|', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..')
-g('Ä', '#...#', '.###.', '#...#', '#...#', '#####', '#...#', '#...#')
-g('Ö', '#...#', '.###.', '#...#', '#...#', '#...#', '#...#', '.###.')
-g('Å', '..#..', '.#.#.', '..#..', '.###.', '#...#', '#####', '#...#')
-g('Ü', '#...#', '.....', '#...#', '#...#', '#...#', '#...#', '.###.')
-g('É', '...#.', '#####', '#....', '####.', '#....', '#....', '#####')
-g(chr(GFX_DOT), '.....', '.###.', '#####', '#####', '#####', '.###.', '.....')
-g(chr(GFX_ARROW), '#....', '##...', '###..', '####.', '###..', '##...', '#....')
-g(chr(GFX_BLOCK), *['#####'] * 7)
-
-# the characters of the sheet, in cell order; fi.alavesa.radio.hud.HudFont maps everything else onto these
-SHEET = [chr(c) for c in range(0x20, 0x60)] + list('ÄÖÅÜÉ') + [chr(GFX_DOT), chr(GFX_ARROW), chr(GFX_BLOCK)]
-SHEET_COLS = 16
+def mix(a, b, t):
+    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(len(a)))
 
 
-def font_sheet():
-    rows = (len(SHEET) + SHEET_COLS - 1) // SHEET_COLS
-    c = Canvas(SHEET_COLS * CELL_W, rows * CELL_H)
-    for i, ch in enumerate(SHEET):
-        cx, cy = (i % SHEET_COLS) * CELL_W, (i // SHEET_COLS) * CELL_H
-        c.glyph(cx, cy, G[ch], (255, 255, 255))
-        # width keeper: one alpha-1 pixel in the cell's last column (invisible; the shader and vanilla discard it)
-        if all(c.px[cy + y][cx + CELL_W - 1][3] == 0 for y in range(CELL_H)):
-            c.set(cx + CELL_W - 1, cy + CELL_H - 1, (0, 0, 0, 1))
-    chars = [''.join(SHEET[r * SHEET_COLS:(r + 1) * SHEET_COLS]) for r in range(rows)]
-    last = chars[-1]
-    chars[-1] = last + ''.join(chr(0xE1F0 + i) for i in range(SHEET_COLS - len(last)))   # filler codepoints, never sent
-    return c, chars
+def rounded(x, y, w, h, r):
+    """Signed distance (px, negative inside) of a rounded rectangle at pixel centre (x+.5, y+.5)."""
+    px, py = x + 0.5 - w / 2, y + 0.5 - h / 2
+    qx, qy = abs(px) - (w / 2 - r), abs(py) - (h / 2 - r)
+    return math.hypot(max(qx, 0), max(qy, 0)) + min(max(qx, qy), 0) - r
 
 
-FRAME, FRAME_LIGHT, FRAME_DARK = (58, 66, 50), (96, 106, 82), (24, 28, 22)
-GLASS = (8, 20, 12, 208)             # translucent: the world shows through a little
-HEADER = (16, 36, 22, 232)
-RULE = (40, 84, 52, 255)
+def coverage(d):
+    return max(0.0, min(1.0, 0.5 - d))
+
+
+# ---- panel art -----------------------------------------------------------------------------------------------------------
+BEZEL_OUT, BEZEL_HI, BEZEL_LO = (22, 24, 27), (92, 98, 106), (44, 48, 54)
+GLASS_TOP, GLASS_BOTTOM = (13, 18, 26, 238), (7, 10, 15, 244)
+HEADER_BAND = (26, 36, 50, 244)
+RULE = (52, 66, 84, 255)
 
 
 def panel():
+    """A handheld radio's screen: graphite bezel with a bevel, deep blue-black glass, a header band, thin rules."""
     c = Canvas(PANEL_W, PANEL_H)
-    c.rect(0, 0, PANEL_W - 1, PANEL_H - 1, GLASS)
-    c.rect(0, 0, PANEL_W - 1, 13, HEADER)
+    for y in range(PANEL_H):
+        for x in range(PANEL_W):
+            d = rounded(x, y, PANEL_W, PANEL_H, 9)
+            if d > 0.5:
+                continue
+            outer = coverage(d)
+            if d > -1.5:                                   # dark outline
+                col = BEZEL_OUT + (255,)
+            elif d > -3.5:                                 # bevel: light from the top left
+                lit = 1.0 - (x / PANEL_W * 0.55 + y / PANEL_H * 0.45)
+                col = mix(BEZEL_LO, BEZEL_HI, max(0.0, min(1.0, lit * 1.4 - 0.2))) + (255,)
+            else:
+                di = rounded(x - 3, y - 3, PANEL_W - 6, PANEL_H - 6, 6)
+                if di > -0.5:                              # inner edge of the glass
+                    col = (10, 12, 15, 255)
+                else:
+                    col = mix(GLASS_TOP, GLASS_BOTTOM, y / PANEL_H)
+                    if y < 21:
+                        col = mix(col, HEADER_BAND, 0.85)
+                    if x % 4 == 0 and y % 4 == 0:           # faint LCD dot grid
+                        col = mix(col, (40, 56, 76, col[3]), 0.35)
+            c.set(x, y, col[:3] + (int(col[3] * outer),))
     for y in SEPARATORS:
-        for x in range(TEXT_X, PANEL_W - TEXT_X): c.set(x, y, RULE)
-    lx, ly, lw, lh = LAMP                                    # dark lamp socket; the lit lamp is its own glyph
-    c.rect(lx, ly, lx + lw - 1, ly + lh - 1, (28, 12, 10, 255)); c.frame(lx, ly, lx + lw - 1, ly + lh - 1, FRAME_DARK)
-    c.frame(0, 0, PANEL_W - 1, PANEL_H - 1, FRAME_DARK)      # the right-most column is opaque: advance = PANEL_W + 1
-    c.frame(1, 1, PANEL_W - 2, PANEL_H - 2, FRAME)
-    for x in range(1, PANEL_W - 1): c.set(x, 1, FRAME_LIGHT)
-    for y in range(1, PANEL_H - 1): c.set(1, y, FRAME_LIGHT)
+        for x in range(TEXT_X, PANEL_W - TEXT_X):
+            c.set(x, y, RULE)
+    lx, ly, lw, lh = LAMP                                  # dark lamp socket; the lit lamp is its own glyph
+    for y in range(ly, ly + lh):
+        for x in range(lx, lx + lw):
+            d = rounded(x - lx, y - ly, lw, lh, 3)
+            if d < 0.5:
+                c.set(x, y, (16, 22, 20, 255) if d < -1 else (60, 72, 70, 255))
     return c
 
 
@@ -197,7 +127,30 @@ def lamp():
     """The lit lamp, as tall as the panel so both art glyphs share one quad height; drawn where LAMP puts it."""
     lx, ly, lw, lh = LAMP
     c = Canvas(lw, PANEL_H)
-    c.rect(0, ly, lw - 1, ly + lh - 1, (214, 44, 34)); c.frame(0, ly, lw - 1, ly + lh - 1, (255, 132, 104))
+    for y in range(lh):
+        for x in range(lw):
+            d = rounded(x, y, lw, lh, 3)
+            if d < 0.5:
+                t = max(0.0, 1.0 - math.hypot((x - lw / 2) / (lw / 2), (y - lh / 2) / (lh / 2)))
+                c.set(x, ly + y, mix((22, 150, 70), (170, 255, 190), t) + (int(255 * coverage(d)),))
+    return c
+
+
+def pill():
+    """The active tab: a rounded key with an amber underline, drawn behind the tab label."""
+    w, h, _ = PILL
+    c = Canvas(w, h)
+    for y in range(h):
+        for x in range(w):
+            d = rounded(x, y, w, h, 5)
+            if d > 0.5:
+                continue
+            col = mix((54, 66, 86), (30, 38, 52), y / (h - 1))
+            if d > -1.2:
+                col = mix(col, (112, 128, 152), 0.65 if y < h // 2 else 0.25)
+            if y >= h - 3 and d < -0.8 and 5 < x < w - 6:
+                col = (255, 186, 60)
+            c.set(x, y, col + (int(255 * coverage(d)),))
     return c
 
 
@@ -207,7 +160,7 @@ RADIO_ITEM_ROWS = [
     '..bggggggggb....', '..bdodododgb....', '..bodododogb....', '..bdodododgb....',
     '..bggggggrgb....', '..bggggggggb....', '..bbbbbbbbbb....', '................',
 ]
-RADIO_ITEM_PALETTE = {'a': (60, 62, 60), 'b': (18, 20, 16), 'g': FRAME, 'p': (124, 255, 154), 'd': (36, 42, 32),
+RADIO_ITEM_PALETTE = {'a': (60, 62, 60), 'b': (18, 20, 16), 'g': (58, 66, 50), 'p': (124, 255, 154), 'd': (36, 42, 32),
                       'o': (24, 28, 22), 'r': (214, 44, 34)}
 
 
@@ -218,29 +171,39 @@ def write_json(path, data):
         f.write('\n')
 
 
+def font_chars():
+    with open(os.path.join(TOOLS, 'hud_chars.json')) as f:
+        return json.load(f)
+
+
 def art():
-    sheet, chars = font_sheet()
-    sheet.save(os.path.join(NS, 'textures', 'font', 'hud.png'))
-    panel().save(os.path.join(NS, 'textures', 'font', 'panel.png'))
-    lamp().save(os.path.join(NS, 'textures', 'font', 'lamp.png'))
     advances = {}
     for n in range(SPACE_BITS):
         advances[chr(SPACE_POS + n)] = float(1 << n)
         advances[chr(SPACE_NEG + n)] = -float(1 << n)
+    chars = font_chars()
+    panel().save(os.path.join(NS, 'textures', 'font', 'panel.png'))
+    lamp().save(os.path.join(NS, 'textures', 'font', 'lamp.png'))
+    pill().save(os.path.join(NS, 'textures', 'font', 'pill.png'))
+    space = {'type': 'space', 'advances': advances}
+    sheet = lambda name: {'type': 'bitmap', 'file': f'radio:font/{name}.png', 'height': CELL_H, 'ascent': 10, 'chars': chars}
+    art_glyph = lambda name, h, ch: {'type': 'bitmap', 'file': f'radio:font/{name}.png', 'height': h, 'ascent': 10, 'chars': [chr(ch)]}
     write_json(os.path.join(NS, 'font', 'hud.json'), {'providers': [
-        {'type': 'space', 'advances': advances},
-        {'type': 'bitmap', 'file': 'radio:font/hud.png', 'height': CELL_H, 'ascent': 7, 'chars': chars},
-        {'type': 'bitmap', 'file': 'radio:font/panel.png', 'height': PANEL_H, 'ascent': 7, 'chars': [chr(CHAR_PANEL)]},
-        {'type': 'bitmap', 'file': 'radio:font/lamp.png', 'height': PANEL_H, 'ascent': 7, 'chars': [chr(CHAR_LAMP)]},
-    ]})
+        space, sheet('hud'), art_glyph('panel', PANEL_H, CHAR_PANEL), art_glyph('lamp', PANEL_H, CHAR_LAMP), art_glyph('pill', PILL[1], CHAR_PILL)]})
+    write_json(os.path.join(NS, 'font', 'bold.json'), {'providers': [space, sheet('bold')]})
     os.makedirs(os.path.join(NS, 'shaders', 'include'), exist_ok=True)
     with open(os.path.join(NS, 'shaders', 'include', 'radio_layout.glsl'), 'w') as f:
         f.write('// Generated by tools/gen_pack.py: the popup geometry in GUI pixels (also mirrored in HudText.java).\n'
                 f'const vec2 RADIO_PANEL = vec2({PANEL_W}.0, {PANEL_H}.0);\n'
                 f'const vec2 RADIO_CELL = vec2({CELL_W}.0, {CELL_H}.0);\n'
+                f'const vec3 RADIO_PILL = vec3({PILL[0]}.0, {PILL[1]}.0, {PILL[2]}.0);   // width, height, y\n'
                 f'const int RADIO_LINES = {len(LINE_Y)};\n'
                 f'const float RADIO_LINE_Y[{len(LINE_Y)}] = float[{len(LINE_Y)}]({", ".join(f"{y}.0" for y in LINE_Y)});\n'
                 f'const vec4 RADIO_LAMP = vec4({", ".join(f"{v}.0" for v in LAMP)});   // x, y, width, height\n')
+    lic = os.path.join(NS, 'licenses')
+    os.makedirs(lic, exist_ok=True)
+    with open(os.path.join(TOOLS, 'fonts', 'OFL.txt')) as src, open(os.path.join(lic, 'B612-OFL.txt'), 'w') as dst:
+        dst.write(src.read())
 
     # The popup rides on a BLUE boss bar. Its bar graphic is blanked so only the (moved) name is drawn. No vanilla
     # mob uses a blue bar; another plugin's blue boss bars lose their bar for players with this pack.

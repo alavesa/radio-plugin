@@ -87,8 +87,11 @@ public final class RadioLocator {
         for (Found f : working(p)) {
             if (!f.state().power()) continue;
             Channel c = channels.get(f.state().channel());
-            if (c == null || !Perms.canListen(p, c)) continue;
-            out.merge(c.id(), f.state().volume(), Math::max);
+            if (c != null && Perms.canListen(p, c)) out.merge(c.id(), f.state().volume(), Math::max);
+            // every tab is monitored: the tuned channel is the one you speak on, the others are heard too
+            if (cfg.tabsMonitorAll) {
+                for (Channel other : channels.all()) if (Perms.canListen(p, other)) out.merge(other.id(), f.state().volume(), Math::max);
+            }
         }
         return out;
     }

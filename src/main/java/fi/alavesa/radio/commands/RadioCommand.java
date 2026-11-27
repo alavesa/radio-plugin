@@ -45,6 +45,10 @@ import org.jspecify.annotations.Nullable;
  * /radio channel rename &lt;id&gt; &lt;name&gt;        radio.admin
  * /radio channel color &lt;id&gt; &lt;color&gt;        radio.admin
  * /radio channel frequency &lt;id&gt; &lt;label&gt;    radio.admin
+ * /radio channel say &lt;id&gt; &lt;text&gt;         radio.admin   (a SYSTEM message on the channel)
+ * /radio channel tab &lt;id&gt; &lt;label&gt;          radio.admin   (the 4-character tab label)
+ * /radio channel edit &lt;id&gt; name|color|frequency|tab &lt;value&gt;   radio.admin
+ * /radio tab next|prev|&lt;n&gt;                  switch the radio's tab (channel)
  * /radio pack                              resend the resource pack to yourself, show its status
  * /radio reload                            radio.reload
  * </pre>
@@ -89,7 +93,17 @@ public final class RadioCommand {
                 .then(Commands.literal("color").then(Commands.argument("id", StringArgumentType.word()).suggests(channelIds)
                         .then(Commands.argument("color", StringArgumentType.greedyString()).suggests(colors).executes(this::channelColor))))
                 .then(Commands.literal("frequency").then(Commands.argument("id", StringArgumentType.word()).suggests(channelIds)
-                        .then(Commands.argument("label", StringArgumentType.greedyString()).executes(this::channelFrequency))));
+                        .then(Commands.argument("label", StringArgumentType.greedyString()).executes(this::channelFrequency))))
+                .then(Commands.literal("say").then(Commands.argument("id", StringArgumentType.word()).suggests(channelIds)
+                        .then(Commands.argument("text", StringArgumentType.greedyString()).executes(this::channelSay))))
+                .then(Commands.literal("tab").then(Commands.argument("id", StringArgumentType.word()).suggests(channelIds)
+                        .then(Commands.argument("label", StringArgumentType.greedyString()).executes(this::channelTab))))
+                // /radio channel edit <id> name|color|frequency|tab <value>: the same edits under one verb
+                .then(Commands.literal("edit").then(Commands.argument("id", StringArgumentType.word()).suggests(channelIds)
+                        .then(Commands.literal("name").then(Commands.argument("name", StringArgumentType.greedyString()).executes(this::channelRename)))
+                        .then(Commands.literal("color").then(Commands.argument("color", StringArgumentType.greedyString()).suggests(colors).executes(this::channelColor)))
+                        .then(Commands.literal("frequency").then(Commands.argument("label", StringArgumentType.greedyString()).executes(this::channelFrequency)))
+                        .then(Commands.literal("tab").then(Commands.argument("label", StringArgumentType.greedyString()).executes(this::channelTab)))));
 
         return Commands.literal("radio")
                 .requires(src -> src.getSender().hasPermission(Perms.USE) || src.getSender().hasPermission(Perms.GIVE)
@@ -98,6 +112,11 @@ public final class RadioCommand {
                 .then(Commands.literal("tune").requires(has(Perms.USE))
                         .then(Commands.argument("channel", StringArgumentType.word()).suggests(usable)
                                 .executes(ctx -> player(ctx, p -> tune(p, StringArgumentType.getString(ctx, "channel"))))))
+                .then(Commands.literal("tab").requires(has(Perms.USE))
+                        .then(Commands.literal("next").executes(ctx -> player(ctx, p -> tab(p, 1, 0))))
+                        .then(Commands.literal("prev").executes(ctx -> player(ctx, p -> tab(p, -1, 0))))
+                        .then(Commands.argument("number", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, 64))
+                                .executes(ctx -> player(ctx, p -> tab(p, 0, com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "number"))))))
                 .then(Commands.literal("volume").requires(has(Perms.USE))
                         .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
                                 .executes(ctx -> player(ctx, p -> volume(p, IntegerArgumentType.getInteger(ctx, "percent"))))))
@@ -157,6 +176,12 @@ public final class RadioCommand {
             return;
         }
         plugin.tune(p, radio, c);
+    }
+
+    private void tab(Player p, int step, int jump) {
+        RadioLocator.Found radio = radio(p);
+        if (radio == null) return;
+        if (!plugin.switchTab(p, radio, step, jump)) plugin.messages().send(p, "error.no-tab");
     }
 
     private void volume(Player p, int percent) {
@@ -302,6 +327,27 @@ public final class RadioCommand {
         plugin.channelsChanged();
         plugin.messages().send(ctx.getSource().getSender(), "channel.frequency-set", Placeholder.component("channel", changed.displayName()),
                 Placeholder.unparsed("frequency", changed.frequency()));
+        return 1;
+    }
+
+    private int channelTab(CommandContext<CommandSourceStack> ctx) {
+        Channel c = channel(ctx);
+        if (c == null) return 0;
+        String label = StringArgumentType.getString(ctx, "label").strip();
+        Channel changed = c.withTab(label.length() > 4 ? label.substring(0, 4) : label);
+        plugin.channels().replace(changed);
+        plugin.channelsChanged();
+        plugin.messages().send(ctx.getSource().getSender(), "channel.tab-set", Placeholder.component("channel", changed.displayName()),
+                Placeholder.unparsed("tab", changed.tabLabel()));
+        return 1;
+    }
+
+    /** /radio channel say <id> <text>: a SYSTEM message on a channel, heard by everyone tuned to it (or monitoring it). */
+    private int channelSay(CommandContext<CommandSourceStack> ctx) {
+        Channel c = channel(ctx);
+        if (c == null) return 0;
+        int heard = plugin.transmitter().announce(c, "SYSTEM", StringArgumentType.getString(ctx, "text"));
+        ctx.getSource().getSender().sendMessage(Component.text("Heard by " + heard + " player(s)."));
         return 1;
     }
 }

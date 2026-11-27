@@ -75,13 +75,31 @@ sounds:
   # Ticks between the "in" sound (transmission starts) and the "out" sound (roger beep). 20 ticks = 1 second.
   out-delay-ticks: 16
 
+tabs:
+  # The radio has one TAB per channel you may use (channels.yml order, 4 shown at a time). The active tab is the one you
+  # transmit on. Switch tabs with: F (swap hands) = next, sneak + F = previous, sneak + scroll wheel = next / previous,
+  # sneak + a number key = that tab number, /radio tab next|prev|<n>, or sneak + right-click on the radio.
+  # true = the radio also hears the OTHER tabs (a dot / count marks unread messages on them). false = only the active tab.
+  monitor-all: true
+  # Messages from a tab you are not on are played at half volume and without the roger beep and screen static.
+  quiet-inactive: true
+  keys:
+    swap-hands: true
+    sneak-scroll: true
+  # Also print "Tuned to <channel>" in chat when switching with the keys (the popup shows the new tab anyway).
+  chat-feedback: false
+  # Ticks the key hints stay in the popup's footer after switching on or changing tab. 0 = never.
+  hint-ticks: 140
+
 popup:
+  # Time zone of the times shown in the message log (an id such as Europe/Helsinki). Empty = the server's.
+  time-zone: ""
   # The radio popup in the corner of the screen: channel, your name, the latest radio messages and what to do. It is
   # there while a powered radio is with the player and gone when the radio is off. It needs the resource pack.
   enabled: true
   # right or left side of the screen.
   side: right
-  # Size: 1.0 = one popup pixel per GUI pixel (176 x 104). 0.5 - 2.0.
+  # Size: 1.0 = one popup pixel per GUI pixel (208 x 138). 0.5 - 2.0.
   scale: 1.0
   # Distance from the side edge and from the top of the screen, GUI pixels. Vanilla draws potion effect icons in the
   # top-right corner (two rows, 52 px); raise margin-top to 56 to sit below them.
@@ -90,7 +108,7 @@ popup:
   # Players without the pack (or when the text shader could not be merged) get a one-line boss bar instead, and read
   # radio messages in chat. false = no bar for them.
   plain-fallback: true
-  # Also print radio messages in chat for players who see the popup. The popup shows the last 5 lines only.
+  # Also print radio messages in chat for players who see the popup. The popup shows the last 5 rows of the active tab.
   messages-in-chat: false
 
 post-effects:

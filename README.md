@@ -9,27 +9,34 @@ pack and serves it on the Minecraft port.
 ## How it plays
 
 - **Right-click the radio**: on / off. The popup is there while the radio is on and gone when it is off.
-- **Sneak + right-click**: next channel.
-- **While it is on, type in chat**: the message is transmitted on the radio's channel. `!text` goes to public chat
-  as usual (`chat.public-prefix`).
-- The popup shows the channel, your name, how many are listening, the volume, the last radio messages and these
-  controls. While a transmission comes in the lamp lights and the panel shows static
-  ([picture](docs/popup-receiving.png)).
-- A player hears a channel when they carry a powered radio tuned to it (`radio.works-when`: held, hotbar or
-  inventory) and have the listen permission.
+- **Tabs = channels.** The radio has one tab for every channel you may use (channels.yml order, four shown at a time,
+  arrows in the margins when there are more). The active tab is the one you transmit on and whose log you read. The other
+  tabs keep receiving (`tabs.monitor-all`): an unread message shows as a dot or a count on the tab, played quieter and
+  without the roger beep (`tabs.quiet-inactive`).
+- **Switching tabs** (all work only while a powered radio is in a hand, so the keys keep their normal meaning otherwise):
+  **F** = next tab, **Sneak + F** = previous, **Sneak + scroll wheel** = next / previous, **Sneak + number key** (not the
+  neighbouring slot) = that tab number, **/radio tab next|prev|N**, or **Sneak + right-click** on the radio. The hotbar
+  does not move. A server cannot read other keys; these are the events it gets (`tabs.keys.*` switch them off).
+- **While it is on, type in chat**: the message is transmitted on the active tab. `!text` goes to public chat as usual.
+- The popup ([a picture](docs/popup.png) shows the old one) is a small device: a header with signal bars (listeners on the
+  tab), the channel name and frequency and the TX/RX lamp; the tab strip with a pill that slides to the new tab and a
+  log that fades in; the message log of the tab (time, sender, text, newest at the bottom); a footer with volume
+  segments and listeners, replaced by the key hints for a few seconds after switching (`tabs.hint-ticks`).
+- A player hears a channel when they carry a powered radio (`radio.works-when`) and have the listen permission.
 
 Players without the resource pack get a one-line boss bar instead of the popup and read radio messages in chat.
 
 ## Build and install
 
 ```
-./gradlew build          # needs a JDK 25 or newer; the jar is build/libs/radio-0.2.1.jar
+./gradlew build          # needs a JDK 25 or newer; the jar is build/libs/radio-0.3.0.jar
 ```
 
 Put the jar in `plugins/` and restart. Delete any older Radio jar first: Paper loads the first jar with the same
 plugin name. LuckPerms and Simple Voice Chat are optional.
 
-`python3 tools/gen_pack.py` regenerates the placeholder art, font, item model and sounds (sounds need `ffmpeg`).
+`java tools/GenFont.java tools/fonts resourcepack/assets/radio/textures/font tools/hud_chars.json` rasterises the fonts, then
+`python3 tools/gen_pack.py` regenerates the panel art, font definitions, layout, item model and sounds (sounds need `ffmpeg`).
 `tools/zip_pack.sh` zips `resourcepack/` and prints the SHA-1.
 
 ## Commands
@@ -38,11 +45,14 @@ plugin name. LuckPerms and Simple Voice Chat are optional.
 |---|---|
 | `/radio` or `/radio power [on\|off]` | `radio.use` |
 | `/radio tune <channel>` | `radio.use` |
+| `/radio tab next\|prev\|<n>` | `radio.use` |
 | `/radio volume <0-100>` | `radio.use` |
 | `/radio say <message>` transmit once | `radio.use` |
 | `/radio pack` pack status, resend | `radio.use` |
 | `/radio give <players> [amount]` | `radio.give` |
-| `/radio channel create\|delete\|rename\|color\|frequency\|list` | `radio.admin` |
+| `/radio channel create\|delete\|rename\|color\|frequency\|tab\|list` | `radio.admin` |
+| `/radio channel edit <id> name\|color\|frequency\|tab <value>` | `radio.admin` |
+| `/radio channel say <id> <text>` a SYSTEM message on a channel | `radio.admin` |
 | `/radio reload` | `radio.reload` |
 
 ## Permissions and LuckPerms
@@ -80,8 +90,10 @@ So:
 - **Post effects** add the burst of static around the top-right corner when a transmission comes in
   (`post-effects.transmission`), per player through `Player.postEffects()`.
 
-The popup font has capitals, digits, common punctuation and Ä Ö Å Ü É. Lower case is shown as upper case, anything
-else as `?`. Set `popup.messages-in-chat: true` if players should also get the full text in chat.
+The popup fonts (`radio:hud`, `radio:bold`) are bitmap sheets of **B612 Mono** (SIL Open Font License 1.1, Airbus / the B612
+project; licence in `assets/radio/licenses/`), rasterised by `tools/GenFont.java` into 7x13 px cells so that every character
+advances exactly 8 px (the layout needs that to put the pen back at 0; a TTF provider cannot guarantee it). They have
+ASCII, ä ö å ü é and a few symbols plus the popup's icons; anything else is shown as `?`. Set `popup.messages-in-chat: true` if players should also get the full text in chat.
 
 `popup.side`, `popup.scale`, `popup.margin-x` and `popup.margin-top` move and size it. Vanilla draws potion effect
 icons in the same corner; `margin-top: 56` puts the popup below them.

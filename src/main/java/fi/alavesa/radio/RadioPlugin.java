@@ -78,6 +78,7 @@ public final class RadioPlugin extends JavaPlugin implements Listener {
         pm.registerEvents(this, this);
         pm.registerEvents(pack, this);
         pm.registerEvents(hud, this);
+        pm.registerEvents(new fi.alavesa.radio.item.TabKeys(this), this);
         pm.registerEvents(itemListener, this);
         pm.registerEvents(new ChatListener(this), this);
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS,
@@ -131,6 +132,7 @@ public final class RadioPlugin extends JavaPlugin implements Listener {
         trackerTask = Bukkit.getScheduler().runTaskTimer(this, tracker, 20L, 10L);
         // after the tracker in the same tick, so listener counts are fresh
         menuTask = Bukkit.getScheduler().runTaskTimer(this, hud, 21L, 10L);
+        hud.start();
         if (packWatchTask == null) packWatchTask = Bukkit.getScheduler().runTaskTimer(this, () -> pack.checkSources(), 100L, 100L);
     }
 
@@ -202,12 +204,35 @@ public final class RadioPlugin extends JavaPlugin implements Listener {
 
     /** Tunes a radio to a channel the player may listen to or speak on. */
     public void tune(Player p, RadioLocator.Found radio, Channel c) {
+        tune(p, radio, c, true);
+    }
+
+    /** @param chat false = no line in chat (the popup shows the new tab; used by the tab keys) */
+    public void tune(Player p, RadioLocator.Found radio, Channel c, boolean chat) {
         RadioItem.State s = locator.update(p, radio, radio.state().withChannel(c.id())).state();
         sounds.play(p, "switch", c, Math.max(s.volume(), 30));
-        messages.send(p, "channel.tuned", Placeholder.component("channel", c.displayName()),
-                Placeholder.unparsed("frequency", c.frequency().isEmpty() ? "-" : c.frequency()));
+        if (chat) {
+            messages.send(p, "channel.tuned", Placeholder.component("channel", c.displayName()),
+                    Placeholder.unparsed("frequency", c.frequency().isEmpty() ? "-" : c.frequency()));
+        }
         tracker.run();
+        hud.tabChanged(p, c.id());
         hud.update(p);
+    }
+
+    /**
+     * Moves the radio to another tab (channel): {@code step} +1 / -1 for next / previous, or {@code jump} (1-based) to a
+     * tab number. The tabs are the channels the player may use, in channels.yml order.
+     */
+    public boolean switchTab(Player p, RadioLocator.Found radio, int step, int jump) {
+        List<Channel> tabs = fi.alavesa.radio.permissions.Perms.visible(p, channels);
+        if (tabs.isEmpty()) return false;
+        int at = -1;
+        for (int i = 0; i < tabs.size(); i++) if (tabs.get(i).id().equals(radio.state().channel())) at = i;
+        int to = jump > 0 ? jump - 1 : Math.floorMod(at + step, tabs.size());
+        if (to < 0 || to >= tabs.size() || to == at) return false;
+        tune(p, radio, tabs.get(to), config.tabsChatFeedback);
+        return true;
     }
 
     /** {prefix, suffix} from LuckPerms, or two empty strings. */

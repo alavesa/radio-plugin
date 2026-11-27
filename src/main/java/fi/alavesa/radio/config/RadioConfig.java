@@ -43,6 +43,10 @@ public final class RadioConfig {
     public final double popupScale;
     public final int popupMarginX, popupMarginTop;
 
+    public final boolean tabsMonitorAll, tabsQuietInactive, tabsSneakScroll, tabsSwapHand, tabsChatFeedback;
+    public final int tabsHintTicks;
+    public final String popupTimeZone;
+
     public final boolean postEnabled;
     public final String postTransmission, postActive;
     public final int postTransmissionTicks;
@@ -102,6 +106,14 @@ public final class RadioConfig {
         popupMarginTop = clamp(c.getInt("popup.margin-top", 4), 0, 1000);
         popupPlainFallback = c.getBoolean("popup.plain-fallback", true);
         popupMessagesInChat = c.getBoolean("popup.messages-in-chat", false);
+
+        tabsMonitorAll = c.getBoolean("tabs.monitor-all", true);
+        tabsQuietInactive = c.getBoolean("tabs.quiet-inactive", true);
+        tabsSneakScroll = c.getBoolean("tabs.keys.sneak-scroll", true);
+        tabsSwapHand = c.getBoolean("tabs.keys.swap-hand", true);
+        tabsChatFeedback = c.getBoolean("tabs.chat-feedback", false);
+        tabsHintTicks = clamp(c.getInt("tabs.hint-ticks", 140), 0, 2400);
+        popupTimeZone = c.getString("popup.time-zone", "").trim();
 
         postEnabled = c.getBoolean("post-effects.enabled", true);
         postTransmission = key(c.getString("post-effects.transmission", ""), "post-effects.transmission", warn);

@@ -9,7 +9,7 @@
 // and a glyph's distance from the centre is its x inside the popup.
 //
 // MARKER: text colour #FEFBxx (red 254, green 251). Blue: bits 0-3 = text line, 15 = art (panel, lamp);
-// bits 4-6 = palette / art flags (see the fragment part). Only GUI text is looked at (IS_GUI); world text (signs,
+// bits 4-6 = palette / art flags; 14 = the tab pill (its own height and row, see radio_layout.glsl). Only GUI text is looked at (IS_GUI); world text (signs,
 // name tags, text displays, maps) is compiled without this code. Does not collide with SuperbVehicles (red 253) or
 // CCTV (#0CC7xx). Ordinary GUI text in exactly this colour would be moved too; nothing in vanilla uses it.
 //
@@ -37,8 +37,8 @@ void radio_text_vertex(vec4 color) {
     vec2 gui = vec2(2.0 / ProjMat[0][0], -2.0 / ProjMat[1][1]);          // GUI size in GUI pixels
     // x inside the popup = distance from the screen centre (rounded: the centre is a half pixel on odd widths)
     float x = floor(gl_Position.x / gl_Position.w * 0.5 * gui.x + 0.75);
-    float top = line == 15 ? 0.0 : RADIO_LINE_Y[min(line, RADIO_LINES - 1)];
-    float height = line == 15 ? RADIO_PANEL.y : RADIO_CELL.y;
+    float top = line == 15 ? 0.0 : line == 14 ? RADIO_PILL.z : RADIO_LINE_Y[min(line, RADIO_LINES - 1)];
+    float height = line == 15 ? RADIO_PANEL.y : line == 14 ? RADIO_PILL.y : RADIO_CELL.y;
     vec2 local = vec2(x, top + k.y * height) * RADIO_HUD_SCALE;
     float left = RADIO_HUD_LEFT > 0.5 ? RADIO_HUD_MARGIN.x : gui.x - RADIO_HUD_MARGIN.x - RADIO_PANEL.x * RADIO_HUD_SCALE;
     vec4 clip = ProjMat * vec4(left + local.x, RADIO_HUD_MARGIN.y + local.y, 0.0, 1.0);

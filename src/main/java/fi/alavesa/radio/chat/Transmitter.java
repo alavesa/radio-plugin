@@ -92,13 +92,19 @@ public final class Transmitter {
             // the sender always gets their own transmission back, even on a speak-only channel
             if (heard == null && !listener.equals(sender)) continue;
             int volume = heard != null ? heard : radio.state().volume();
-            plugin.hud().message(listener, sender, message);
+            // a tab the listener is not on: logged and counted as unread, but heard softly and without the roger beep
+            String tuned = plugin.tracker().tuned(listener.getUniqueId());
+            boolean otherTab = cfg.tabsQuietInactive && tuned != null && !tuned.equals(channel.id()) && !listener.equals(sender);
+            if (otherTab) volume = volume / 2;
+            plugin.hud().message(listener, channel.id(), sender, message);
             // the popup shows the message; chat carries it for players without the popup (or when configured)
             if (hasLine && (cfg.popupMessagesInChat || !plugin.hud().fancy(listener))) listener.sendMessage(line);
-            plugin.sounds().play(listener, "in", channel, volume);
+            final int vol = volume;
+            plugin.sounds().play(listener, "in", channel, vol);
+            if (otherTab) continue;
             plugin.postFx().burst(listener);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (listener.isOnline()) plugin.sounds().play(listener, "out", channel, volume);
+                if (listener.isOnline()) plugin.sounds().play(listener, "out", channel, vol);
             }, cfg.outDelayTicks);
         }
         if (cfg.logToConsole) {
@@ -106,6 +112,21 @@ public final class Transmitter {
                     Placeholder.unparsed("sender", sender.getName()), Placeholder.unparsed("message", message)));
         }
         return true;
+    }
+
+    /** A message from the server itself ("SYSTEM") to everyone who hears the channel; no radio needed by the sender. */
+    public int announce(Channel channel, String senderName, String text) {
+        int heard = 0;
+        for (Player listener : Bukkit.getOnlinePlayers()) {
+            Integer volume = plugin.locator().hearing(listener, plugin.channels()).get(channel.id());
+            if (volume == null) continue;
+            heard++;
+            String tuned = plugin.tracker().tuned(listener.getUniqueId());
+            boolean otherTab = plugin.config().tabsQuietInactive && tuned != null && !tuned.equals(channel.id());
+            plugin.hud().message(listener, channel.id(), senderName, false, text);
+            plugin.sounds().play(listener, "in", channel, otherTab ? volume / 2 : volume);
+        }
+        return heard;
     }
 
     private TagResolver tags(Player sender, Channel channel, String message, RadioConfig cfg) {

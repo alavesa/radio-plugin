@@ -28,6 +28,7 @@ error:
   global-protected: "<red>The global channel cannot be deleted."
   invalid-color: "<red>Unknown colour <white><color></white>. Use #RRGGBB or a name such as gold."
   no-players: "<red>No player matched."
+  no-tab: "<red>There is no other tab to switch to."
 
 rule:
   held: "hold it in a hand"
@@ -48,6 +49,7 @@ channel:
   deleted: "<gray>Channel <white><id></white> deleted."
   renamed: "<gray>Channel <white><id></white> is now <channel><gray>."
   recolored: "<gray>Channel <channel> <gray>recoloured."
+  tab-set: "<gray>Channel <channel> <gray>now has the tab label <white><tab></white>."
   frequency-set: "<gray>Channel <channel> <gray>is now on <white><frequency></white>."
   list-header: "<gray>Channels (<count>):"
   list-entry: "<dark_gray> • <channel> <dark_gray>(<white><id></white>, <frequency>) <gray><listeners> listening"
@@ -64,16 +66,18 @@ pack:
   status: "<gray>Resource pack: <white><status></white> <dark_gray>(delivery <delivery>)"
   resent: "<gray>Sending the resource pack again."
 
-# The popup. These texts are drawn in the popup's own font: capitals, digits and common punctuation only, at most 28
-# characters per line (longer lines are cut). No MiniMessage here, except in "plain".
+# The popup. These texts are drawn in the popup's own font: ASCII letters and digits, a few accented letters (ä ö å ü é)
+# and common punctuation; anything else shows as ?. At most 24 characters per row (longer texts are cut). No MiniMessage
+# here, except in "plain".
 hud:
   no-channel: "NO CHANNEL"
   listeners: "<count> ON"
-  volume: "VOL <volume>"
-  no-traffic: "NO TRAFFIC"
-  hint-chat: "CHAT=TRANSMIT  <prefix>TEXT=PUBLIC"
-  hint-say: "/RADIO SAY <TEXT> TO TRANSMIT"
-  hint-listen-only: "LISTEN ONLY ON THIS CHANNEL"
-  hint-controls: "CLICK=OFF  SNEAK+CLICK=CHAN"
+  volume-label: "VOL"
+  no-traffic: "No traffic"
+  hint-chat: "Type in chat to transmit"
+  hint-say: "/radio say <text> to talk"
+  hint-listen-only: "Listen only on this tab"
+  # Shown in the footer for a few seconds after switching on or changing tab (tabs.hint-ticks).
+  hint-tabs: "F or SNEAK+SCROLL: tab"
   # The one-line boss bar for players without the pack (MiniMessage).
   plain: "<gold>Radio</gold> <channel> <gray><frequency> <dark_gray>| <gray>chat = transmit, <prefix>text = public <dark_gray>| <gray>right-click = off"
